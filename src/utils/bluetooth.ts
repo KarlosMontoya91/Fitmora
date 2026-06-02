@@ -17,6 +17,7 @@ export class BluetoothService {
   private device: BluetoothDevice | null = null;
   private server: BluetoothRemoteGATTServer | null = null;
   private fitnessChar: BluetoothRemoteGATTCharacteristic | null = null;
+  private controlChar: BluetoothRemoteGATTCharacteristic | null = null;
   private heartChar: BluetoothRemoteGATTCharacteristic | null = null;
 
   /**
@@ -85,6 +86,15 @@ export class BluetoothService {
             onDataReceived(parsed);
           });
         }
+
+        // Get Control Point Characteristic (UUID: 0x2AD9)
+        try {
+          this.controlChar = await fitnessService.getCharacteristic('fitness_machine_control_point');
+          // Request Control (Opcode 0x00)
+          await this.requestControl();
+        } catch (err) {
+          console.warn('No se pudo establecer control del dispositivo:', err);
+        }
       } catch (err) {
         console.log('No fitness machine service active, checking heart rate service...', err);
       }
@@ -120,7 +130,86 @@ export class BluetoothService {
     this.device = null;
     this.server = null;
     this.fitnessChar = null;
+    this.controlChar = null;
     this.heartChar = null;
+  }
+
+  /**
+   * Request control of the fitness machine (Opcode 0x00)
+   */
+  public async requestControl(): Promise<void> {
+    if (!this.controlChar) return;
+    try {
+      const command = new Uint8Array([0x00]);
+      await this.controlChar.writeValue(command);
+      console.log('FTMS Control Point control requested.');
+    } catch (e) {
+      console.warn('Failed to request FTMS control:', e);
+    }
+  }
+
+  /**
+   * Start or Resume the treadmill (Opcode 0x07)
+   */
+  public async startMachine(): Promise<void> {
+    if (!this.controlChar) return;
+    try {
+      const command = new Uint8Array([0x07]);
+      await this.controlChar.writeValue(command);
+      console.log('FTMS Start command sent.');
+    } catch (e) {
+      console.warn('Failed to send start command:', e);
+    }
+  }
+
+  /**
+   * Stop or Pause the treadmill (Opcode 0x08, parameter: 0x01 = STOP, 0x02 = PAUSE)
+   */
+  public async stopMachine(pause: boolean = false): Promise<void> {
+    if (!this.controlChar) return;
+    try {
+      const command = new Uint8Array([0x08, pause ? 0x02 : 0x01]);
+      await this.controlChar.writeValue(command);
+      console.log('FTMS Stop command sent.');
+    } catch (e) {
+      console.warn('Failed to send stop command:', e);
+    }
+  }
+
+  /**
+   * Set target speed in km/h (Opcode 0x02, speed in 0.01 km/h)
+   */
+  public async setMachineSpeed(speedKmh: number): Promise<void> {
+    if (!this.controlChar) return;
+    try {
+      const speedRaw = Math.round(speedKmh * 100);
+      const command = new Uint8Array(3);
+      command[0] = 0x02; // Opcode
+      command[1] = speedRaw & 0xFF;        // Speed LSB
+      command[2] = (speedRaw >> 8) & 0xFF; // Speed MSB
+      await this.controlChar.writeValue(command);
+      console.log(`FTMS Speed command sent: ${speedKmh} km/h`);
+    } catch (e) {
+      console.warn('Failed to send speed command:', e);
+    }
+  }
+
+  /**
+   * Set target incline in % (Opcode 0x03, incline in 0.1 %)
+   */
+  public async setMachineIncline(inclinePercent: number): Promise<void> {
+    if (!this.controlChar) return;
+    try {
+      const inclineRaw = Math.round(inclinePercent * 10);
+      const command = new Uint8Array(3);
+      command[0] = 0x03; // Opcode
+      command[1] = inclineRaw & 0xFF;        // Incline LSB
+      command[2] = (inclineRaw >> 8) & 0xFF; // Incline MSB
+      await this.controlChar.writeValue(command);
+      console.log(`FTMS Incline command sent: ${inclinePercent}%`);
+    } catch (e) {
+      console.warn('Failed to send incline command:', e);
+    }
   }
 
   /**

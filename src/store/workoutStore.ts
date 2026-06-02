@@ -133,8 +133,14 @@ export const useWorkoutStore = create<WorkoutStore>()(
       },
 
       tick: () => {
-        const { activeWorkout, isPaused } = get();
+        const { activeWorkout, isPaused, bluetoothConnected } = get();
         if (!activeWorkout || isPaused) return;
+
+        // Auto-pause timer if Bluetooth connected and speed is 0
+        if (bluetoothConnected && activeWorkout.currentSpeed <= 0) {
+          // Treadmill is physically stopped, wait for motor to turn
+          return;
+        }
 
         const userStore = useUserStore.getState();
         const weight = userStore.profile?.weight || 70; // fallback to 70kg
@@ -203,10 +209,15 @@ export const useWorkoutStore = create<WorkoutStore>()(
                   nextSpeed = nextStep.targetSpeed;
                   nextIncline = nextStep.targetIncline || 0;
                   nextCadence = nextStep.targetCadence || 0;
+
+                  // Write speed/incline to physical BLE device if connected!
+                  if (bluetoothConnected) {
+                    bleService.setMachineSpeed(nextSpeed);
+                    bleService.setMachineIncline(nextIncline);
+                  }
                 }
               } else {
                 // Plan steps exhausted, workout complete!
-                // Keep ticking, but label as cooldown or keep state
                 nextTimeRemaining = 0;
               }
             }
@@ -232,13 +243,17 @@ export const useWorkoutStore = create<WorkoutStore>()(
       },
 
       finishWorkout: () => {
-        const { activeWorkout } = get();
+        const { activeWorkout, bluetoothConnected } = get();
         if (!activeWorkout) return null;
+
+        // Stop the physical treadmill motor if connected!
+        if (bluetoothConnected) {
+          bleService.stopMachine(false);
+        }
 
         const userStore = useUserStore.getState();
 
         // Calculate XP and Coins
-        // Distance and duration rewards
         const xpEarned = Math.round((activeWorkout.distance * 100) + (activeWorkout.duration / 6) + 50);
         const coinsEarned = Math.round((activeWorkout.distance * 10) + (activeWorkout.duration / 20) + 15);
 
@@ -276,6 +291,10 @@ export const useWorkoutStore = create<WorkoutStore>()(
       },
 
       discardWorkout: () => {
+        const { bluetoothConnected } = get();
+        if (bluetoothConnected) {
+          bleService.stopMachine(false);
+        }
         set({
           activeWorkout: null,
           isPaused: false,
@@ -287,10 +306,17 @@ export const useWorkoutStore = create<WorkoutStore>()(
         set((state) => {
           if (!state.activeWorkout) return {};
           const clampedSpeed = Math.max(0.5, Math.min(speed, 22)); // Max 22km/h
+          const roundedSpeed = Number(clampedSpeed.toFixed(1));
+
+          // Write to physical BLE device if connected!
+          if (state.bluetoothConnected) {
+            bleService.setMachineSpeed(roundedSpeed);
+          }
+
           return {
             activeWorkout: {
               ...state.activeWorkout,
-              currentSpeed: Number(clampedSpeed.toFixed(1)),
+              currentSpeed: roundedSpeed,
             },
           };
         });
@@ -300,10 +326,17 @@ export const useWorkoutStore = create<WorkoutStore>()(
         set((state) => {
           if (!state.activeWorkout) return {};
           const clampedIncline = Math.max(0, Math.min(incline, 15)); // Max 15% incline
+          const roundedIncline = Number(clampedIncline.toFixed(1));
+
+          // Write to physical BLE device if connected!
+          if (state.bluetoothConnected) {
+            bleService.setMachineIncline(roundedIncline);
+          }
+
           return {
             activeWorkout: {
               ...state.activeWorkout,
-              currentIncline: Number(clampedIncline.toFixed(1)),
+              currentIncline: roundedIncline,
             },
           };
         });

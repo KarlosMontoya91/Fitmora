@@ -4,8 +4,9 @@ import { useWorkoutStore } from '../store/workoutStore';
 import { useUserStore } from '../store/userStore';
 import { useRewardStore } from '../store/rewardStore';
 import { WORKOUT_PLANS } from '../data/workoutPlans';
-import { Dumbbell, Compass, MapPin, Play, Pause, Square, Bluetooth, BluetoothSearching, Wifi, Volume2, ShieldAlert, Sparkles, Heart } from 'lucide-react';
+import { Dumbbell, Compass, MapPin, Play, Pause, Square, Bluetooth, BluetoothSearching, Check, Wifi, Volume2, ShieldAlert, Sparkles, Heart } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { bleService } from '../utils/bluetooth';
 
 export const WorkoutActive: React.FC = () => {
   const { type } = useParams<{ type: string }>();
@@ -47,6 +48,15 @@ export const WorkoutActive: React.FC = () => {
   const [motivatorMessage, setMotivatorMessage] = useState('¡A darle con todo hoy! ⚡');
   const [showExitConfirm, setShowExitConfirm] = useState(false);
 
+  // Pre-workout Setup/Pairing Screen state
+  const [isSetupScreen, setIsSetupScreen] = useState(
+    type === 'treadmill' || type === 'bike'
+  );
+  const isSetupRef = useRef(isSetupScreen);
+  useEffect(() => {
+    isSetupRef.current = isSetupScreen;
+  }, [isSetupScreen]);
+
   // Motivational messages
   const MOTIVATORS = [
     '¡Vas excelente, mantén el ritmo! 💪',
@@ -68,7 +78,9 @@ export const WorkoutActive: React.FC = () => {
 
     // Set interval ticker (ticks every 1 second)
     timerRef.current = setInterval(() => {
-      tick();
+      if (!isSetupRef.current) {
+        tick();
+      }
     }, 1000);
 
     // Rotate motivational comments every 20 seconds
@@ -220,6 +232,128 @@ export const WorkoutActive: React.FC = () => {
   };
 
   const zone = getEffortZone(activeWorkout.heartRate);
+
+  if (isSetupScreen) {
+    return (
+      <div className="flex h-full flex-col bg-slate-900 text-white p-6 justify-between select-none animate-fadeIn">
+        {/* Top Header */}
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <span className="text-xs font-black uppercase tracking-wider text-slate-400">
+            Sincronización de Sensores
+          </span>
+          <button
+            onClick={handleDiscard}
+            className="text-xs font-bold text-slate-450 hover:text-slate-350"
+          >
+            SALIR
+          </button>
+        </div>
+
+        {/* Mascot Speech Bubble & Status */}
+        <div className="flex flex-col items-center text-center my-auto gap-5">
+          <img
+            src="/mascot.jpg"
+            alt="Coach Mora"
+            className="w-28 h-28 object-cover rounded-3xl border-4 border-brand-primary bg-slate-950 shadow-xl animate-bounce-slow"
+            onError={(e) => {
+              (e.target as HTMLElement).style.display = 'none';
+            }}
+          />
+          
+          <div className="rounded-2xl bg-slate-850 p-4 border border-slate-850 text-left max-w-xs relative">
+            <span className="text-[9px] font-black text-brand-primary tracking-wider uppercase block mb-1">Coach Mora</span>
+            <p className="text-xs font-extrabold text-slate-300 leading-relaxed">
+              {activeWorkout.type === 'treadmill'
+                ? "¡Excelente elección, caminadora! 🏃‍♂️ Enciende tu equipo y pulsa buscar para emparejarla por Bluetooth. ¡Así controlaré el motor y registraré tu velocidad de manera exacta!"
+                : "¡A rodar! 🚴‍♂️ Enciende tus sensores de cadencia o rodillo inteligente y conéctalos por Bluetooth para registrar tu potencia y RPM."
+              }
+            </p>
+            <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[8px] border-b-slate-850" />
+          </div>
+
+          {/* Connection Status Box */}
+          <div className="w-full max-w-xs rounded-2xl bg-slate-950 p-4 border border-slate-850 text-center">
+            {bluetoothConnected ? (
+              <div className="flex flex-col items-center gap-2 animate-fadeIn">
+                <div className="h-10 w-10 rounded-full bg-emerald-500/20 border border-emerald-500 flex items-center justify-center text-emerald-400">
+                  <Check className="h-6 w-6 stroke-[3]" />
+                </div>
+                <span className="text-xs font-black text-emerald-400">DISPOSITIVO VINCULADO</span>
+                <span className="text-[10px] text-slate-450 font-bold leading-tight">
+                  {activeWorkout.type === 'treadmill' ? '🏃‍♂️ Caminadora Sincronizada' : '🚴‍♂️ Rodillo Inteligente'}
+                </span>
+                <button
+                  onClick={disconnectBluetooth}
+                  className="text-[9px] font-extrabold text-red-400 hover:text-red-300 mt-2 underline"
+                >
+                  DESCONECTAR
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-3">
+                {bluetoothSearching ? (
+                  <div className="flex flex-col items-center gap-2 py-2 animate-pulse">
+                    <BluetoothSearching className="h-10 w-10 text-brand-primary animate-spin" />
+                    <span className="text-xs font-black text-amber-400">ESCANEANDO DISPOSITIVOS...</span>
+                    <span className="text-[9px] text-slate-500">Selecciona tu equipo en la ventana de tu navegador</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2.5 w-full">
+                    <button
+                      onClick={async () => {
+                        try {
+                          await startBluetoothSearch();
+                        } catch (e) {
+                          // error is already handled
+                        }
+                      }}
+                      className="btn-game-primary py-3.5 text-xs font-black flex items-center justify-center gap-2 w-full shadow-lg"
+                    >
+                      <Bluetooth className="h-4.5 w-4.5 animate-pulse" />
+                      <span>🔌 CONECTAR POR BLUETOOTH</span>
+                    </button>
+                    <p className="text-[9px] text-slate-555 leading-tight">
+                      Asegúrate de otorgar los permisos de Bluetooth cuando tu navegador te lo solicite.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Start Actions */}
+        <div className="flex flex-col gap-3 mt-4 border-t border-slate-800 pt-4">
+          {bluetoothConnected ? (
+            <button
+              onClick={async () => {
+                try {
+                  await bleService.startMachine();
+                  changeSpeed(2.0); // Start at 2.0 km/h walking speed
+                } catch (e) {
+                  console.warn('Machine start failed:', e);
+                }
+                setIsSetupScreen(false);
+              }}
+              className="btn-game-primary bg-emerald-500 hover:bg-emerald-400 py-4 text-sm font-black flex items-center justify-center gap-2 w-full animate-bounce-slow"
+              style={{ boxShadow: '0 4px 0 #059669' }}
+            >
+              <Play className="h-5 w-5 fill-current" />
+              <span>🚀 ¡INICIAR EQUIPO Y ENTRENAR!</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => setIsSetupScreen(false)}
+              className="btn-game-outline border-slate-800 bg-slate-850 hover:bg-slate-800 text-slate-200 py-3.5 text-xs font-black flex items-center justify-center gap-2 w-full"
+              style={{ boxShadow: 'none' }}
+            >
+              <span>Entrenar sin Conexión (Modo Manual) 📴</span>
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full flex-col bg-slate-900 text-white p-4 justify-between select-none relative">
@@ -472,63 +606,113 @@ export const WorkoutActive: React.FC = () => {
         </div>
       </div>
 
-      {/* 7. MANUAL ADJUSTMENT SLIDERS (only visible if Bluetooth not connected) */}
-      {!bluetoothConnected && (
-        <div className="rounded-2xl bg-slate-900 border border-slate-800 p-3 my-1 flex flex-col gap-2 select-none">
-          {activeWorkout.type === 'bike' ? (
-            /* Bike Cadence adjustment */
-            <div className="flex flex-col">
-              <div className="flex justify-between items-center mb-0.5">
-                <span className="text-[9px] font-black text-slate-450 uppercase">Pedaleo Manual (Cadencia RPM)</span>
-                <span className="text-xs font-black text-cyan-400">{activeWorkout.currentCadence} RPM</span>
-              </div>
-              <input
-                type="range"
-                min="30"
-                max="140"
-                value={activeWorkout.currentCadence}
-                onChange={(e) => changeCadence(Number(e.target.value))}
-                className="w-full accent-cyan-400"
-              />
+      {/* 7. CONSOLE ADJUSTMENT WIDGETS */}
+      <div className="flex flex-col gap-2 my-1 select-none">
+        {activeWorkout.type === 'treadmill' && (
+          <div className="rounded-3xl bg-slate-950 p-4 border border-slate-850 flex flex-col gap-3">
+            {/* Speed row */}
+            <div className="flex justify-between items-center">
+              <span className="text-[10px] font-black text-indigo-400 tracking-wider uppercase">Consola de Velocidad (km/h)</span>
+              {bluetoothConnected && (
+                <span className="text-[8px] font-black text-emerald-400 tracking-wider uppercase animate-pulse">
+                  ⚡ Sincronizado BLE
+                </span>
+              )}
             </div>
-          ) : (
-            /* Treadmill Speed/Incline adjustment */
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col">
-                <div className="flex justify-between items-center mb-0.5">
-                  <span className="text-[9px] font-black text-slate-450 uppercase">Velocidad</span>
-                  <span className="text-xs font-black text-indigo-400">{activeWorkout.currentSpeed} km/h</span>
-                </div>
-                <input
-                  type="range"
-                  min="2"
-                  max="18"
-                  step="0.5"
-                  value={activeWorkout.currentSpeed}
-                  onChange={(e) => changeSpeed(Number(e.target.value))}
-                  className="w-full accent-indigo-400"
-                />
+
+            <div className="flex items-center justify-between gap-3">
+              <button
+                onClick={() => changeSpeed(activeWorkout.currentSpeed - 0.5)}
+                className="flex-1 h-14 rounded-2xl bg-red-600/25 border border-red-500/30 hover:bg-red-500/20 font-black text-xl flex items-center justify-center active:scale-95 transition-all text-red-400"
+                aria-label="Disminuir velocidad 0.5 km/h"
+              >
+                -0.5
+              </button>
+
+              <div className="w-24 flex flex-col items-center justify-center py-1.5 bg-slate-900 rounded-2xl border border-slate-850 shrink-0">
+                <span className="text-3xl font-black text-white tabular-nums leading-none">
+                  {activeWorkout.currentSpeed.toFixed(1)}
+                </span>
               </div>
 
-              <div className="flex flex-col">
-                <div className="flex justify-between items-center mb-0.5">
-                  <span className="text-[9px] font-black text-slate-450 uppercase">Inclinación</span>
-                  <span className="text-xs font-black text-indigo-400">{activeWorkout.currentIncline}%</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="12"
-                  step="1"
-                  value={activeWorkout.currentIncline}
-                  onChange={(e) => changeIncline(Number(e.target.value))}
-                  className="w-full accent-indigo-400"
-                />
+              <button
+                onClick={() => changeSpeed(activeWorkout.currentSpeed + 0.5)}
+                className="flex-1 h-14 rounded-2xl bg-emerald-600/25 border border-emerald-500/30 hover:bg-emerald-500/20 font-black text-xl flex items-center justify-center active:scale-95 transition-all text-emerald-400"
+                aria-label="Aumentar velocidad 0.5 km/h"
+              >
+                +0.5
+              </button>
+            </div>
+
+            {/* Quick preset keys */}
+            <div className="grid grid-cols-6 gap-1.5 mt-0.5">
+              {[1, 3, 5, 7, 9, 12].map((presetSpeed) => (
+                <button
+                  key={presetSpeed}
+                  onClick={() => changeSpeed(presetSpeed)}
+                  className={`py-2 rounded-xl text-xs font-black transition-all active:scale-90 border-2 ${
+                    Math.round(activeWorkout.currentSpeed) === presetSpeed
+                      ? 'bg-brand-primary border-brand-primary text-white shadow-md'
+                      : 'bg-slate-900 border-slate-850 hover:border-slate-800 text-slate-350'
+                  }`}
+                >
+                  {presetSpeed}
+                </button>
+              ))}
+            </div>
+
+            {/* Incline Row */}
+            <div className="flex items-center justify-between gap-3 border-t border-slate-900 pt-3 mt-1.5">
+              <span className="text-[9px] font-black text-slate-450 uppercase tracking-wider">Inclinación</span>
+              
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => changeIncline(activeWorkout.currentIncline - 1)}
+                  className="h-9 w-12 rounded-xl bg-slate-900 border border-slate-850 hover:border-slate-800 text-xs font-black flex items-center justify-center active:scale-90 text-slate-300"
+                >
+                  -1
+                </button>
+                <span className="text-xs font-black text-indigo-400 w-8 text-center tabular-nums">
+                  {activeWorkout.currentIncline}%
+                </span>
+                <button
+                  onClick={() => changeIncline(activeWorkout.currentIncline + 1)}
+                  className="h-9 w-12 rounded-xl bg-slate-900 border border-slate-850 hover:border-slate-800 text-xs font-black flex items-center justify-center active:scale-90 text-slate-300"
+                >
+                  +1
+                </button>
               </div>
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+
+        {activeWorkout.type === 'bike' && (
+          <div className="rounded-3xl bg-slate-950 p-4 border border-slate-850 flex flex-col gap-3">
+            <span className="text-[10px] font-black text-cyan-400 tracking-wider uppercase">Consola de Pedaleo (Cadencia RPM)</span>
+            <div className="flex items-center justify-between gap-3">
+              <button
+                onClick={() => changeCadence(activeWorkout.currentCadence - 5)}
+                className="flex-1 h-14 rounded-2xl bg-slate-900 border border-slate-850 hover:border-slate-800 font-black text-lg flex items-center justify-center active:scale-95 transition-all text-slate-300"
+              >
+                -5 RPM
+              </button>
+
+              <div className="w-24 flex flex-col items-center justify-center py-1.5 bg-slate-900 rounded-2xl border border-slate-850 shrink-0">
+                <span className="text-2xl font-black text-cyan-400 tabular-nums leading-none">
+                  {activeWorkout.currentCadence}
+                </span>
+              </div>
+
+              <button
+                onClick={() => changeCadence(activeWorkout.currentCadence + 5)}
+                className="flex-1 h-14 rounded-2xl bg-cyan-900/25 border border-cyan-850 hover:bg-cyan-800/20 font-black text-lg flex items-center justify-center active:scale-95 transition-all text-cyan-400"
+              >
+                +5 RPM
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* 8. CONTROLS BAR */}
       <div className="flex justify-between items-center gap-3.5 border-t border-slate-800 pt-3.5 mt-1">
