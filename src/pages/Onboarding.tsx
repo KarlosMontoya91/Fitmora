@@ -135,7 +135,7 @@ export const Onboarding: React.FC = () => {
         {step === 1 && (
           <div className="flex flex-col items-center text-center">
             <img 
-              src="/mascot.jpg" 
+              src={`${import.meta.env.BASE_URL}mascot.jpg`} 
               alt="Coach Mora de Fitmora" 
               className="w-32 h-32 object-cover rounded-3xl border-4 border-slate-200 bg-slate-50 shadow-lg mb-6 dark:border-slate-800 dark:bg-slate-950 animate-bounce-slow"
               onError={(e) => {
@@ -475,7 +475,7 @@ export const Onboarding: React.FC = () => {
         {step === 8 && (
           <div className="flex flex-col items-center text-center">
             <img 
-              src="/mascot.jpg" 
+              src={`${import.meta.env.BASE_URL}mascot.jpg`} 
               alt="Coach Mora celebrando" 
               className="w-24 h-24 object-cover rounded-2xl border-2 border-brand-primary bg-slate-50 shadow-md mb-4 dark:bg-slate-950 animate-bounce-slow"
               onError={(e) => {

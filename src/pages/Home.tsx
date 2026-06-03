@@ -156,7 +156,7 @@ export const Home: React.FC = () => {
       {/* Coach Mora Motivational Widget */}
       <section className="card-game p-4 flex gap-4 items-center bg-amber-50/50 dark:bg-slate-900/50 border border-amber-200/40 dark:border-slate-800/40 animate-fadeIn select-none">
         <img 
-          src="/mascot.jpg" 
+          src={`${import.meta.env.BASE_URL}mascot.jpg`} 
           alt="Coach Mora" 
           className="w-16 h-16 object-cover rounded-2xl border-2 border-brand-primary bg-white shadow shrink-0"
           onError={(e) => {

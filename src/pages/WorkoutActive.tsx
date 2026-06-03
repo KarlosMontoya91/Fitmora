@@ -75,25 +75,28 @@ export const WorkoutActive: React.FC = () => {
       // Start free workout of specified type
       startWorkout((type as any) || 'free');
     }
+  }, [type, activeWorkout, startWorkout]);
 
-    // Set interval ticker (ticks every 1 second)
-    timerRef.current = setInterval(() => {
+  // Set interval ticker (ticks every 1 second)
+  useEffect(() => {
+    const timer = setInterval(() => {
       if (!isSetupRef.current) {
         tick();
       }
     }, 1000);
 
-    // Rotate motivational comments every 20 seconds
-    motivatorTimerRef.current = setInterval(() => {
+    return () => clearInterval(timer);
+  }, [tick]);
+
+  // Rotate motivational comments every 20 seconds
+  useEffect(() => {
+    const motivatorTimer = setInterval(() => {
       const idx = Math.floor(Math.random() * MOTIVATORS.length);
       setMotivatorMessage(MOTIVATORS[idx]);
     }, 20000);
 
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (motivatorTimerRef.current) clearInterval(motivatorTimerRef.current);
-    };
-  }, [type, activeWorkout]);
+    return () => clearInterval(motivatorTimer);
+  }, []);
 
   // Handle active map drawer for GPS mode
   useEffect(() => {
@@ -252,7 +255,7 @@ export const WorkoutActive: React.FC = () => {
         {/* Mascot Speech Bubble & Status */}
         <div className="flex flex-col items-center text-center my-auto gap-5">
           <img
-            src="/mascot.jpg"
+            src={`${import.meta.env.BASE_URL}mascot.jpg`}
             alt="Coach Mora"
             className="w-28 h-28 object-cover rounded-3xl border-4 border-brand-primary bg-slate-950 shadow-xl animate-bounce-slow"
             onError={(e) => {
@@ -425,7 +428,7 @@ export const WorkoutActive: React.FC = () => {
       </div>
 
       {/* 3. SIMULATOR OR MAP CONTAINER */}
-      <div className="flex-1 min-h-[170px] max-h-[220px] rounded-3xl bg-slate-950 overflow-hidden relative border border-slate-850 p-3">
+      <div className="flex-1 min-h-[110px] max-h-[140px] md:min-h-[160px] md:max-h-[200px] rounded-3xl bg-slate-950 overflow-hidden relative border border-slate-850 p-3">
         {activeWorkout.type === 'gps' ? (
           <>
             {/* Outdoor GPS route live drawing canvas */}
@@ -593,7 +596,7 @@ export const WorkoutActive: React.FC = () => {
       {/* 6. COGNITIVE/MOTIVATION WIDGET */}
       <div className="flex items-center gap-3.5 rounded-2xl bg-slate-950/50 px-3.5 py-3 border border-indigo-950/40 my-1 select-none text-left">
         <img 
-          src="/mascot.jpg" 
+          src={`${import.meta.env.BASE_URL}mascot.jpg`} 
           alt="Coach Mora" 
           className="w-10 h-10 object-cover rounded-xl border border-brand-primary bg-slate-900 shrink-0"
           onError={(e) => {

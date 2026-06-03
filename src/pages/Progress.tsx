@@ -16,6 +16,7 @@ export const Progress: React.FC = () => {
   const { profile, theme } = useUserStore();
 
   const [filter, setFilter] = useState<'week' | 'month' | 'year'>('week');
+  const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
   
   // Post-workout state
   const [sessionSummary, setSessionSummary] = useState<WorkoutSession | null>(null);
@@ -250,43 +251,83 @@ export const Progress: React.FC = () => {
           </div>
         ) : (
           <div className="flex flex-col gap-2.5">
-            {history.map((sess) => (
-              <div 
-                key={sess.id}
-                className="card-game p-3.5 flex items-center justify-between border border-slate-100 dark:border-slate-800 bg-white/70 backdrop-blur-sm dark:bg-slate-900/40"
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-xl shrink-0 ${
-                    sess.type === 'treadmill' ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400'
-                    : sess.type === 'bike' ? 'bg-cyan-50 text-cyan-600 dark:bg-cyan-950/30 dark:text-cyan-400'
-                    : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400'
-                  }`}>
-                    {sess.type === 'treadmill' && <Dumbbell className="h-4.5 w-4.5" />}
-                    {sess.type === 'bike' && <Compass className="h-4.5 w-4.5" />}
-                    {sess.type === 'gps' && <MapPin className="h-4.5 w-4.5" />}
-                    {sess.type === 'free' && <Dumbbell className="h-4.5 w-4.5" />}
-                  </div>
-                  
-                  <div className="flex flex-col">
-                    <span className="text-xs font-black text-slate-800 dark:text-slate-200 leading-tight">
-                      {sess.planName || (sess.type === 'treadmill' ? 'Caminadora Libre' : sess.type === 'bike' ? 'Bici Libre' : 'GPS Libre')}
-                    </span>
-                    <span className="text-[9px] text-slate-450 font-bold mt-0.5 uppercase">
-                      📆 {new Date(sess.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} • ⏱️ {Math.round(sess.duration / 60)} min
-                    </span>
-                  </div>
-                </div>
+            {history.map((sess) => {
+              const isExpanded = expandedSessionId === sess.id;
+              return (
+                <div 
+                  key={sess.id}
+                  onClick={() => setExpandedSessionId(isExpanded ? null : sess.id)}
+                  className="card-game p-3.5 flex flex-col border border-slate-100 dark:border-slate-800 bg-white/70 backdrop-blur-sm dark:bg-slate-900/40 cursor-pointer hover:border-slate-300 dark:hover:border-slate-700 transition-all select-none"
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-xl shrink-0 ${
+                        sess.type === 'treadmill' ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400'
+                        : sess.type === 'bike' ? 'bg-cyan-50 text-cyan-600 dark:bg-cyan-950/30 dark:text-cyan-400'
+                        : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400'
+                      }`}>
+                        {sess.type === 'treadmill' && <Dumbbell className="h-4.5 w-4.5" />}
+                        {sess.type === 'bike' && <Compass className="h-4.5 w-4.5" />}
+                        {sess.type === 'gps' && <MapPin className="h-4.5 w-4.5" />}
+                        {sess.type === 'free' && <Dumbbell className="h-4.5 w-4.5" />}
+                      </div>
+                      
+                      <div className="flex flex-col text-left">
+                        <span className="text-xs font-black text-slate-800 dark:text-slate-200 leading-tight">
+                          {sess.planName || (sess.type === 'treadmill' ? 'Caminadora Libre' : sess.type === 'bike' ? 'Bici Libre' : 'GPS Libre')}
+                        </span>
+                        <span className="text-[9px] text-slate-450 font-bold mt-0.5 uppercase">
+                          📆 {new Date(sess.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} • ⏱️ {formatDuration(sess.duration)}
+                        </span>
+                      </div>
+                    </div>
 
-                <div className="text-right flex flex-col justify-center">
-                  <span className="text-xs font-black text-slate-800 dark:text-slate-100 leading-none">
-                    +{sess.distance.toFixed(1)} km
-                  </span>
-                  <span className="text-[9px] font-extrabold text-brand-secondary dark:text-brand-secondaryDark mt-1">
-                    💰 +{sess.coinsEarned} • 🏆 +{sess.xpEarned} XP
-                  </span>
+                    <div className="text-right flex flex-col justify-center">
+                      <span className="text-xs font-black text-slate-800 dark:text-slate-100 leading-none">
+                        +{sess.distance.toFixed(2)} km
+                      </span>
+                      <span className="text-[9px] font-extrabold text-brand-secondary dark:text-brand-secondaryDark mt-1">
+                        💰 +{sess.coinsEarned} • 🏆 +{sess.xpEarned} XP
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Collapsible Splits Segment Breakdown */}
+                  {isExpanded && sess.splits && sess.splits.length > 0 && (
+                    <div 
+                      className="mt-3 pt-3 border-t border-slate-150 dark:border-slate-800 flex flex-col gap-2 animate-fadeIn"
+                      onClick={(e) => e.stopPropagation()} // Prevent close
+                    >
+                      <span className="text-[9px] font-black text-indigo-500 dark:text-brand-primaryDark uppercase tracking-widest block text-left">
+                        📋 TRAMOS Y RITMOS REGISTRADOS:
+                      </span>
+                      <div className="flex flex-col gap-1.5 mt-1">
+                        {sess.splits.map((split, index) => (
+                          <div key={index} className="flex justify-between items-center text-[11px] py-1 border-b border-slate-100 dark:border-slate-850 last:border-b-0">
+                            <div className="flex flex-col text-left">
+                              <span className="font-bold text-slate-700 dark:text-slate-350">
+                                Tramo {index + 1}: {split.speed.toFixed(1)} km/h
+                              </span>
+                              <span className="text-[9px] text-slate-450">
+                                Ritmo: {getPace(split.speed)} /km {split.incline > 0 ? `• Inclinación: +${split.incline}%` : ''}
+                              </span>
+                            </div>
+                            <div className="text-right">
+                              <span className="font-extrabold text-slate-850 dark:text-slate-200">
+                                {split.distance.toFixed(2)} km
+                              </span>
+                              <span className="text-[9px] text-slate-400 block">
+                                ⏱️ {formatDuration(split.duration)}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
@@ -345,6 +386,37 @@ export const Progress: React.FC = () => {
                 <span className="text-[9px] text-slate-400">TIEMPO POR KM</span>
               </div>
             </div>
+
+            {/* Splits/Segment breakdown */}
+            {sessionSummary.splits && sessionSummary.splits.length > 0 && (
+              <div className="mb-5 text-left bg-slate-50 dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-850">
+                <span className="text-[10px] font-black text-slate-450 dark:text-slate-500 uppercase tracking-widest block mb-2 text-center">
+                  📊 RITMOS Y TRAMOS REGISTRADOS
+                </span>
+                <div className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1">
+                  {sessionSummary.splits.map((split, index) => (
+                    <div key={index} className="flex justify-between items-center text-xs border-b border-slate-200/50 dark:border-slate-800/50 pb-1.5 last:border-b-0 last:pb-0">
+                      <div className="flex flex-col">
+                        <span className="font-black text-slate-700 dark:text-slate-350">
+                          Tramo {index + 1}: {split.speed.toFixed(1)} km/h
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          Ritmo: {getPace(split.speed)} /km {split.incline > 0 ? `• Inclinación: +${split.incline}%` : ''}
+                        </span>
+                      </div>
+                      <div className="text-right flex flex-col items-end">
+                        <span className="font-extrabold text-brand-primary dark:text-brand-primaryDark">
+                          {split.distance.toFixed(2)} km
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          ⏱️ {formatDuration(split.duration)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Virtual Currency and XP awards layout */}
             <div className="rounded-2xl bg-gradient-to-r from-emerald-500/10 to-indigo-500/10 border-2 border-emerald-500/20 p-4.5 text-center flex items-center justify-around mb-5">

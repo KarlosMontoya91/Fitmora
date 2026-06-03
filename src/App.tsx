@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useUserStore } from './store/userStore';
 import { AppLayout } from './components/layout/AppLayout';
@@ -20,6 +20,7 @@ const RouteGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
 export const App: React.FC = () => {
   const { theme } = useUserStore();
+  const [showSplash, setShowSplash] = useState(true);
 
   // Sync theme class on load
   useEffect(() => {
@@ -29,6 +30,10 @@ export const App: React.FC = () => {
       document.documentElement.classList.remove('dark');
     }
   }, [theme]);
+
+  if (showSplash) {
+    return <Splash onComplete={() => setShowSplash(false)} />;
+  }
 
   return (
     <HashRouter>
@@ -95,12 +100,9 @@ export const App: React.FC = () => {
             }
           />
 
-          {/* Splash Presentation */}
-          <Route
-            path="/"
-            element={<Splash />}
-          />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          {/* Fallbacks */}
+          <Route path="/" element={<Navigate to="/home" replace />} />
+          <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
       </AppLayout>
     </HashRouter>
@@ -108,3 +110,4 @@ export const App: React.FC = () => {
 };
 
 export default App;
+

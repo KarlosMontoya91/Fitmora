@@ -22,6 +22,13 @@ export interface WorkoutPlan {
   goalCalories?: number;
 }
 
+export interface WorkoutSplit {
+  speed: number;
+  incline: number;
+  duration: number; // in seconds
+  distance: number; // in km
+}
+
 export interface WorkoutSession {
   id: string;
   type: WorkoutType;
@@ -39,4 +46,6 @@ export interface WorkoutSession {
   planName?: string;
   xpEarned: number;
   coinsEarned: number;
+  splits?: WorkoutSplit[];
 }
+

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { WorkoutSession, WorkoutType, WorkoutPlan, WorkoutStep } from '../types/workout';
+import type { WorkoutSession, WorkoutType, WorkoutPlan, WorkoutStep, WorkoutSplit } from '../types/workout';
 import { calculateCaloriesPerSecond } from '../utils/calories';
 import { useUserStore } from './userStore';
 import { WORKOUT_PLANS } from '../data/workoutPlans';
@@ -23,6 +23,12 @@ interface ActiveWorkoutState {
   currentStepIndex: number;
   timeRemainingInStep: number;
   autoControlSpeed: boolean; // Simulates automatic treadmill speed adjustment from the app
+  
+  // Physics & wall-clock sync engine
+  lastTickTime: number; // absolute timestamp of the last tick
+  splits: WorkoutSplit[];
+  currentSegmentDuration: number; // time spent in current speed/incline segment
+  currentSegmentDistance: number; // distance covered in current segment
 }
 
 interface WorkoutStore {
@@ -58,6 +64,81 @@ interface WorkoutStore {
 
 const INITIAL_GPS_START = { lat: 19.4326, lng: -99.1332 }; // Central Mexico City coordinates for simulator
 
+// Helper to integrate elapsed metrics based on delta time
+const integrateWorkoutMetrics = (
+  active: ActiveWorkoutState,
+  isPaused: boolean,
+  now: number,
+  weight: number
+) => {
+  if (isPaused || active.currentSpeed <= 0) {
+    return {
+      duration: active.duration,
+      distance: active.distance,
+      calories: active.calories,
+      currentSegmentDuration: active.currentSegmentDuration,
+      currentSegmentDistance: active.currentSegmentDistance,
+      lastTickTime: now,
+    };
+  }
+
+  const deltaSec = (now - active.lastTickTime) / 1000;
+  if (deltaSec <= 0) {
+    return {
+      duration: active.duration,
+      distance: active.distance,
+      calories: active.calories,
+      currentSegmentDuration: active.currentSegmentDuration,
+      currentSegmentDistance: active.currentSegmentDistance,
+      lastTickTime: now,
+    };
+  }
+
+  // 1. Time duration
+  const nextDuration = active.duration + deltaSec;
+
+  // 2. Calories
+  const calorieBurnPerSec = calculateCaloriesPerSecond(
+    active.type,
+    active.currentSpeed,
+    weight,
+    active.currentIncline
+  );
+  const nextCalories = active.calories + (calorieBurnPerSec * deltaSec);
+
+  // 3. Distance (Speed in km/h -> km/s)
+  const distancePerSec = active.currentSpeed / 3600;
+  const deltaDistance = distancePerSec * deltaSec;
+  const nextDistance = active.distance + deltaDistance;
+
+  // 4. Current Segment/Split accumulation
+  const nextSegmentDuration = active.currentSegmentDuration + deltaSec;
+  const nextSegmentDistance = active.currentSegmentDistance + deltaDistance;
+
+  return {
+    duration: nextDuration,
+    distance: nextDistance,
+    calories: nextCalories,
+    currentSegmentDuration: nextSegmentDuration,
+    currentSegmentDistance: nextSegmentDistance,
+    lastTickTime: now,
+  };
+};
+
+// Helper to transition the current active split to the lists
+const transitionSplit = (active: ActiveWorkoutState): WorkoutSplit[] => {
+  if (active.currentSegmentDuration > 0 || active.currentSegmentDistance > 0) {
+    const newSplit: WorkoutSplit = {
+      speed: active.currentSpeed,
+      incline: active.currentIncline,
+      duration: Number(active.currentSegmentDuration.toFixed(1)),
+      distance: Number(active.currentSegmentDistance.toFixed(3)),
+    };
+    return [...active.splits, newSplit];
+  }
+  return active.splits;
+};
+
 export const useWorkoutStore = create<WorkoutStore>()(
   persist(
     (set, get) => ({
@@ -91,6 +172,7 @@ export const useWorkoutStore = create<WorkoutStore>()(
           initialCadence = type === 'bike' ? 70 : 0;
         }
 
+        const now = Date.now();
         set({
           activeWorkout: {
             id: Math.random().toString(36).substring(2, 9),
@@ -109,6 +191,10 @@ export const useWorkoutStore = create<WorkoutStore>()(
             currentStepIndex: 0,
             timeRemainingInStep: initialTimeInStep,
             autoControlSpeed: true,
+            lastTickTime: now,
+            splits: [],
+            currentSegmentDuration: 0,
+            currentSegmentDistance: 0,
           },
           isPaused: false,
           gpsSignal: type === 'gps' ? 'searching' : 'none',
@@ -125,58 +211,85 @@ export const useWorkoutStore = create<WorkoutStore>()(
       },
 
       pauseWorkout: () => {
-        set({ isPaused: true });
+        set((state) => {
+          if (!state.activeWorkout) return {};
+          const now = Date.now();
+          const userStore = useUserStore.getState();
+          const weight = userStore.profile?.weight || 70;
+          
+          // Integrate pending metrics before pausing
+          const integrated = integrateWorkoutMetrics(state.activeWorkout, false, now, weight);
+          const nextSplits = transitionSplit({ ...state.activeWorkout, ...integrated });
+
+          return {
+            isPaused: true,
+            activeWorkout: {
+              ...state.activeWorkout,
+              ...integrated,
+              splits: nextSplits,
+              currentSegmentDuration: 0,
+              currentSegmentDistance: 0,
+              lastTickTime: now,
+            }
+          };
+        });
       },
 
       resumeWorkout: () => {
-        set({ isPaused: false });
+        set((state) => {
+          if (!state.activeWorkout) return {};
+          const now = Date.now();
+          return {
+            isPaused: false,
+            activeWorkout: {
+              ...state.activeWorkout,
+              lastTickTime: now,
+              currentSegmentDuration: 0,
+              currentSegmentDistance: 0,
+            }
+          };
+        });
       },
 
       tick: () => {
         const { activeWorkout, isPaused, bluetoothConnected } = get();
         if (!activeWorkout || isPaused) return;
 
-        // Auto-pause timer if Bluetooth connected and speed is 0
-        if (bluetoothConnected && activeWorkout.currentSpeed <= 0) {
-          // Treadmill is physically stopped, wait for motor to turn
+        const now = Date.now();
+        const userStore = useUserStore.getState();
+        const weight = userStore.profile?.weight || 70;
+
+        // If speed is 0, the workout is auto-paused/stopped.
+        // We tick the lastTickTime so we keep up to date with wall clock, but do not increment duration.
+        if (activeWorkout.currentSpeed <= 0) {
+          set({
+            activeWorkout: {
+              ...activeWorkout,
+              lastTickTime: now,
+            }
+          });
           return;
         }
 
-        const userStore = useUserStore.getState();
-        const weight = userStore.profile?.weight || 70; // fallback to 70kg
+        // Integrate time, distance, and calories using deltaSec
+        const integrated = integrateWorkoutMetrics(activeWorkout, false, now, weight);
 
-        // 1. Time ticks
-        const nextDuration = activeWorkout.duration + 1;
-
-        // 2. Calories tick
-        const calorieBurnPerSec = calculateCaloriesPerSecond(
-          activeWorkout.type,
-          activeWorkout.currentSpeed,
-          weight,
-          activeWorkout.currentIncline
-        );
-        const nextCalories = activeWorkout.calories + calorieBurnPerSec;
-
-        // 3. Distance tick (Speed is in km/h, distance increases by km per second)
-        const distancePerSec = activeWorkout.currentSpeed / 3600;
-        const nextDistance = activeWorkout.distance + distancePerSec;
-
-        // 4. Max speed tracking
+        // Max speed tracking
         const nextMaxSpeed = Math.max(activeWorkout.maxSpeed, activeWorkout.currentSpeed);
 
-        // 5. Heart rate simulation (rises/falls slightly based on speed)
+        // Heart rate simulation (rises/falls slightly based on speed and incline)
+        const deltaSec = (now - activeWorkout.lastTickTime) / 1000;
         let nextHeartRate = activeWorkout.heartRate;
         const targetHeartRate = 70 + (activeWorkout.currentSpeed * 8) + (activeWorkout.currentIncline * 4);
         if (nextHeartRate < targetHeartRate - 2) {
-          nextHeartRate += 1;
+          nextHeartRate += 1 * deltaSec;
         } else if (nextHeartRate > targetHeartRate + 2) {
-          nextHeartRate -= 1;
+          nextHeartRate -= 1 * deltaSec;
         }
 
-        // 6. GPS path simulation
+        // GPS path simulation (every 4 seconds)
         let nextRoute = [...activeWorkout.route];
-        if (activeWorkout.type === 'gps' && nextRoute.length > 0 && nextDuration % 4 === 0) {
-          // Add minor walking step simulation coordinates
+        if (activeWorkout.type === 'gps' && nextRoute.length > 0 && Math.floor(integrated.duration) % 4 === 0 && Math.floor(activeWorkout.duration) % 4 !== 0) {
           const lastPoint = nextRoute[nextRoute.length - 1];
           const latDiff = (Math.random() - 0.5) * 0.00015 * (activeWorkout.currentSpeed / 4);
           const lngDiff = (Math.random() - 0.5) * 0.00015 * (activeWorkout.currentSpeed / 4);
@@ -186,26 +299,33 @@ export const useWorkoutStore = create<WorkoutStore>()(
           });
         }
 
-        // 7. Plan intervals progression
+        // Plan intervals progression
         let nextStepIndex = activeWorkout.currentStepIndex;
-        let nextTimeRemaining = activeWorkout.timeRemainingInStep - 1;
+        let nextTimeRemaining = activeWorkout.timeRemainingInStep - deltaSec;
         let nextSpeed = activeWorkout.currentSpeed;
         let nextIncline = activeWorkout.currentIncline;
         let nextCadence = activeWorkout.currentCadence;
+        let finalSplits = activeWorkout.splits;
+        let finalSegDuration = integrated.currentSegmentDuration;
+        let finalSegDistance = integrated.currentSegmentDistance;
 
         if (activeWorkout.planId) {
           const plan = WORKOUT_PLANS.find(p => p.id === activeWorkout.planId);
           if (plan) {
             if (nextTimeRemaining <= 0) {
-              // Move to next step
               const nextStepIdx = activeWorkout.currentStepIndex + 1;
               if (nextStepIdx < plan.steps.length) {
                 const nextStep = plan.steps[nextStepIdx];
                 nextStepIndex = nextStepIdx;
                 nextTimeRemaining = (nextStep.minuteEnd - nextStep.minuteStart) * 60;
                 
-                // If autoControlSpeed is enabled, adjust device automatically
                 if (activeWorkout.autoControlSpeed) {
+                  // Transition the old segment split
+                  const withIntegrated = { ...activeWorkout, ...integrated };
+                  finalSplits = transitionSplit(withIntegrated);
+                  finalSegDuration = 0;
+                  finalSegDistance = 0;
+
                   nextSpeed = nextStep.targetSpeed;
                   nextIncline = nextStep.targetIncline || 0;
                   nextCadence = nextStep.targetCadence || 0;
@@ -217,7 +337,6 @@ export const useWorkoutStore = create<WorkoutStore>()(
                   }
                 }
               } else {
-                // Plan steps exhausted, workout complete!
                 nextTimeRemaining = 0;
               }
             }
@@ -227,17 +346,19 @@ export const useWorkoutStore = create<WorkoutStore>()(
         set({
           activeWorkout: {
             ...activeWorkout,
-            duration: nextDuration,
-            distance: nextDistance,
-            calories: nextCalories,
+            ...integrated,
+            splits: finalSplits,
+            currentSegmentDuration: finalSegDuration,
+            currentSegmentDistance: finalSegDistance,
             maxSpeed: nextMaxSpeed,
-            heartRate: nextHeartRate,
+            heartRate: Math.round(nextHeartRate),
             route: nextRoute,
             currentStepIndex: nextStepIndex,
-            timeRemainingInStep: nextTimeRemaining,
+            timeRemainingInStep: Math.max(0, nextTimeRemaining),
             currentSpeed: nextSpeed,
             currentIncline: nextIncline,
             currentCadence: nextCadence,
+            lastTickTime: now,
           }
         });
       },
@@ -251,20 +372,28 @@ export const useWorkoutStore = create<WorkoutStore>()(
           bleService.stopMachine(false);
         }
 
+        const now = Date.now();
         const userStore = useUserStore.getState();
+        const weight = userStore.profile?.weight || 70;
+
+        // Integrate any pending metrics up to now
+        const integrated = integrateWorkoutMetrics(activeWorkout, false, now, weight);
+        const finalSplits = transitionSplit({ ...activeWorkout, ...integrated });
 
         // Calculate XP and Coins
-        const xpEarned = Math.round((activeWorkout.distance * 100) + (activeWorkout.duration / 6) + 50);
-        const coinsEarned = Math.round((activeWorkout.distance * 10) + (activeWorkout.duration / 20) + 15);
+        const finalDistance = Number(integrated.distance.toFixed(2));
+        const finalDuration = Math.round(integrated.duration);
+        const xpEarned = Math.round((finalDistance * 100) + (finalDuration / 6) + 50);
+        const coinsEarned = Math.round((finalDistance * 10) + (finalDuration / 20) + 15);
 
         const newSession: WorkoutSession = {
           id: activeWorkout.id,
           type: activeWorkout.type,
           date: new Date().toISOString(),
-          duration: activeWorkout.duration,
-          distance: Number(activeWorkout.distance.toFixed(2)),
-          calories: Math.round(activeWorkout.calories),
-          avgSpeed: Number((activeWorkout.distance / (activeWorkout.duration / 3600) || activeWorkout.currentSpeed).toFixed(1)),
+          duration: finalDuration,
+          distance: finalDistance,
+          calories: Math.round(integrated.calories),
+          avgSpeed: Number((finalDistance / (finalDuration / 3600) || activeWorkout.currentSpeed).toFixed(1)),
           maxSpeed: Number(activeWorkout.maxSpeed.toFixed(1)),
           avgCadence: activeWorkout.type === 'bike' ? activeWorkout.currentCadence : undefined,
           route: activeWorkout.type === 'gps' ? activeWorkout.route : undefined,
@@ -273,6 +402,7 @@ export const useWorkoutStore = create<WorkoutStore>()(
           planName: activeWorkout.planName,
           xpEarned,
           coinsEarned,
+          splits: finalSplits,
         };
 
         // Save to store history
@@ -305,7 +435,7 @@ export const useWorkoutStore = create<WorkoutStore>()(
       changeSpeed: (speed) => {
         set((state) => {
           if (!state.activeWorkout) return {};
-          const clampedSpeed = Math.max(0.5, Math.min(speed, 22)); // Max 22km/h
+          const clampedSpeed = Math.max(0, Math.min(speed, 22)); // Max 22km/h (allow 0 to pause)
           const roundedSpeed = Number(clampedSpeed.toFixed(1));
 
           // Write to physical BLE device if connected!
@@ -313,10 +443,33 @@ export const useWorkoutStore = create<WorkoutStore>()(
             bleService.setMachineSpeed(roundedSpeed);
           }
 
+          const now = Date.now();
+          const userStore = useUserStore.getState();
+          const weight = userStore.profile?.weight || 70;
+
+          // Integrate pending metrics with the OLD speed
+          const integrated = integrateWorkoutMetrics(state.activeWorkout, state.isPaused, now, weight);
+          
+          let finalSplits = state.activeWorkout.splits;
+          let finalSegDuration = integrated.currentSegmentDuration;
+          let finalSegDistance = integrated.currentSegmentDistance;
+
+          if (roundedSpeed !== state.activeWorkout.currentSpeed) {
+            finalSplits = transitionSplit({ ...state.activeWorkout, ...integrated });
+            finalSegDuration = 0;
+            finalSegDistance = 0;
+          }
+
           return {
             activeWorkout: {
               ...state.activeWorkout,
+              ...integrated,
+              splits: finalSplits,
+              currentSegmentDuration: finalSegDuration,
+              currentSegmentDistance: finalSegDistance,
               currentSpeed: roundedSpeed,
+              maxSpeed: Math.max(state.activeWorkout.maxSpeed, roundedSpeed),
+              lastTickTime: now,
             },
           };
         });
@@ -333,10 +486,32 @@ export const useWorkoutStore = create<WorkoutStore>()(
             bleService.setMachineIncline(roundedIncline);
           }
 
+          const now = Date.now();
+          const userStore = useUserStore.getState();
+          const weight = userStore.profile?.weight || 70;
+
+          // Integrate pending metrics with the OLD incline
+          const integrated = integrateWorkoutMetrics(state.activeWorkout, state.isPaused, now, weight);
+          
+          let finalSplits = state.activeWorkout.splits;
+          let finalSegDuration = integrated.currentSegmentDuration;
+          let finalSegDistance = integrated.currentSegmentDistance;
+
+          if (roundedIncline !== state.activeWorkout.currentIncline) {
+            finalSplits = transitionSplit({ ...state.activeWorkout, ...integrated });
+            finalSegDuration = 0;
+            finalSegDistance = 0;
+          }
+
           return {
             activeWorkout: {
               ...state.activeWorkout,
+              ...integrated,
+              splits: finalSplits,
+              currentSegmentDuration: finalSegDuration,
+              currentSegmentDistance: finalSegDistance,
               currentIncline: roundedIncline,
+              lastTickTime: now,
             },
           };
         });
@@ -346,12 +521,37 @@ export const useWorkoutStore = create<WorkoutStore>()(
         set((state) => {
           if (!state.activeWorkout) return {};
           const clampedCadence = Math.max(20, Math.min(cadence, 150)); // RPM range 20-150
+          const roundedCadence = Math.round(clampedCadence);
+          const newSpeed = Number((roundedCadence * 0.3).toFixed(1));
+
+          const now = Date.now();
+          const userStore = useUserStore.getState();
+          const weight = userStore.profile?.weight || 70;
+
+          // Integrate pending metrics with the OLD speed
+          const integrated = integrateWorkoutMetrics(state.activeWorkout, state.isPaused, now, weight);
+
+          let finalSplits = state.activeWorkout.splits;
+          let finalSegDuration = integrated.currentSegmentDuration;
+          let finalSegDistance = integrated.currentSegmentDistance;
+
+          if (newSpeed !== state.activeWorkout.currentSpeed) {
+            finalSplits = transitionSplit({ ...state.activeWorkout, ...integrated });
+            finalSegDuration = 0;
+            finalSegDistance = 0;
+          }
+
           return {
             activeWorkout: {
               ...state.activeWorkout,
-              currentCadence: Math.round(clampedCadence),
-              // Approximate speed based on cadence (e.g. cadence 80 RPM -> ~24 km/h)
-              currentSpeed: Number((clampedCadence * 0.3).toFixed(1)),
+              ...integrated,
+              splits: finalSplits,
+              currentSegmentDuration: finalSegDuration,
+              currentSegmentDistance: finalSegDistance,
+              currentCadence: roundedCadence,
+              currentSpeed: newSpeed,
+              maxSpeed: Math.max(state.activeWorkout.maxSpeed, newSpeed),
+              lastTickTime: now,
             },
           };
         });
@@ -375,14 +575,45 @@ export const useWorkoutStore = create<WorkoutStore>()(
           const deviceName = await bleService.requestDevice((data) => {
             const active = get().activeWorkout;
             if (active) {
+              const now = Date.now();
+              const userStore = useUserStore.getState();
+              const weight = userStore.profile?.weight || 70;
+              
+              // Integrate metrics with the OLD speed/incline first
+              const integrated = integrateWorkoutMetrics(active, get().isPaused, now, weight);
+
+              const nextSpeed = data.speed !== undefined ? data.speed : active.currentSpeed;
+              const nextIncline = data.incline !== undefined ? data.incline : active.currentIncline;
+              const nextCadence = data.cadence !== undefined ? data.cadence : active.currentCadence;
+              const nextHeartRate = data.heartRate !== undefined ? data.heartRate : active.heartRate;
+              
+              // Use device distance if provided, otherwise use integrated distance
+              const nextDistance = data.distance !== undefined ? data.distance : integrated.distance;
+
+              let finalSplits = active.splits;
+              let finalSegDuration = integrated.currentSegmentDuration;
+              let finalSegDistance = integrated.currentSegmentDistance;
+
+              if (nextSpeed !== active.currentSpeed || nextIncline !== active.currentIncline) {
+                finalSplits = transitionSplit({ ...active, ...integrated });
+                finalSegDuration = 0;
+                finalSegDistance = 0;
+              }
+
               set({
                 activeWorkout: {
                   ...active,
-                  currentSpeed: data.speed !== undefined ? data.speed : active.currentSpeed,
-                  currentIncline: data.incline !== undefined ? data.incline : active.currentIncline,
-                  currentCadence: data.cadence !== undefined ? data.cadence : active.currentCadence,
-                  heartRate: data.heartRate !== undefined ? data.heartRate : active.heartRate,
-                  distance: data.distance !== undefined ? data.distance : active.distance,
+                  ...integrated,
+                  splits: finalSplits,
+                  currentSegmentDuration: finalSegDuration,
+                  currentSegmentDistance: finalSegDistance,
+                  currentSpeed: nextSpeed,
+                  currentIncline: nextIncline,
+                  currentCadence: nextCadence,
+                  heartRate: nextHeartRate,
+                  distance: nextDistance,
+                  maxSpeed: Math.max(active.maxSpeed, nextSpeed),
+                  lastTickTime: now,
                 }
               });
             }
@@ -425,7 +656,7 @@ export const useWorkoutStore = create<WorkoutStore>()(
       }
     }),
     {
-      name: 'trainier-workout-store',
+      name: 'fitmora-workout-store',
       partialize: (state) => ({ history: state.history }), // Only persist workout history, not active session!
     }
   )
