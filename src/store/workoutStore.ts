@@ -427,10 +427,16 @@ export const useWorkoutStore = create<WorkoutStore>()(
           isPaused: false,
         }));
 
+        // Calculate next level based on total distance (1 level per 5 km)
+        const updatedHistory = [newSession, ...get().history];
+        const nextTotalDistance = updatedHistory.reduce((acc, cur) => acc + cur.distance, 0);
+        const nextLevel = Math.floor(nextTotalDistance / 5) + 1;
+
         // Award resources to user profile
         userStore.addCoins(coinsEarned);
         userStore.addXP(xpEarned);
         userStore.incrementStreak();
+        userStore.updateProfile({ userLevel: nextLevel });
 
         return newSession;
       },

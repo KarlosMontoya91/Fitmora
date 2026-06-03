@@ -30,18 +30,19 @@ export const Home: React.FC = () => {
     return '¡Buenas noches';
   };
 
-  // Gamified XP bar values
-  const currentXP = profile.experience;
-  // Calculate relative XP for this specific level (e.g. if level 2 and total XP is 1200, relative XP is 200/2000)
-  // Our userStore formula is: total XP increases, level requirement is level * 1000.
-  // Let's find the current level base XP
-  let prevLevelsXP = 0;
-  for (let i = 1; i < profile.userLevel; i++) {
-    prevLevelsXP += i * 1000;
-  }
-  const relativeXP = currentXP - prevLevelsXP;
-  const relativeXPRequired = profile.userLevel * 1000;
-  const xpPercent = Math.min(100, Math.max(0, (relativeXP / relativeXPRequired) * 100));
+  // Calculate distance-based level stats (1 level per 5 km)
+  const totalDistance = history.reduce((acc, curr) => acc + curr.distance, 0);
+  const currentLevel = Math.floor(totalDistance / 5) + 1;
+  const distanceInCurrentLevel = totalDistance % 5;
+  const progressPercentage = (distanceInCurrentLevel / 5) * 100;
+  const kmRemaining = 5 - distanceInCurrentLevel;
+
+  const { updateProfile } = useUserStore();
+  React.useEffect(() => {
+    if (profile.userLevel !== currentLevel) {
+      updateProfile({ userLevel: currentLevel });
+    }
+  }, [profile.userLevel, currentLevel, updateProfile]);
 
   // Motivator based on favorite activity
   const getFavoriteMotivator = () => {
@@ -74,24 +75,24 @@ export const Home: React.FC = () => {
             <span className="text-xs font-black">RACHA X{profile.streak}</span>
           </div>
         ) : (
-          <div className="flex items-center gap-1 rounded-2xl bg-slate-100 border border-slate-200 px-3 py-1 text-slate-400 dark:bg-slate-900 dark:text-slate-600 dark:border-slate-800">
+          <div className="flex items-center gap-1 rounded-2xl bg-slate-100 border border-slate-200 px-3 py-1 text-slate-400 dark:bg-slate-900 dark:text-slate-650 dark:border-slate-800">
             <Flame className="h-4.5 w-4.5" />
             <span className="text-xs font-black">SIN RACHA</span>
           </div>
         )}
       </div>
 
-      {/* 2. Gamified Level XP Progression Bar */}
+      {/* 2. Gamified Level Kilometer Progression Bar */}
       <section className="card-game p-4.5 bg-gradient-to-br from-indigo-500 to-indigo-600 dark:from-slate-900 dark:to-indigo-950 border-0 shadow-lg text-white">
         <div className="flex justify-between items-center mb-2">
           <div className="flex items-center gap-2">
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/20 font-black text-xs text-white">
               Lvl
             </div>
-            <span className="text-sm font-extrabold">Nivel {profile.userLevel}</span>
+            <span className="text-sm font-extrabold">Nivel {currentLevel}</span>
           </div>
           <span className="text-xs font-black bg-white/20 px-2 py-0.5 rounded-full select-none text-slate-100">
-            {Math.round(relativeXP)} / {relativeXPRequired} XP
+            {distanceInCurrentLevel.toFixed(2)} / 5.00 km
           </span>
         </div>
         
@@ -99,12 +100,12 @@ export const Home: React.FC = () => {
         <div className="h-3.5 w-full bg-white/25 rounded-full p-0.5 overflow-hidden">
           <div 
             className="h-full rounded-full bg-gradient-to-r from-cyan-300 to-emerald-400 transition-all duration-500"
-            style={{ width: `${xpPercent}%` }}
+            style={{ width: `${progressPercentage}%` }}
           />
         </div>
         
         <p className="text-[10px] text-indigo-100 mt-2 font-bold select-none text-right">
-          ¡Faltan {Math.round(relativeXPRequired - relativeXP)} XP para subir al Nivel {profile.userLevel + 1}! 🏆
+          ¡Faltan {kmRemaining.toFixed(2)} km para subir al Nivel {currentLevel + 1}! 🏆
         </p>
       </section>
 
