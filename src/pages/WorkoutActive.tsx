@@ -174,7 +174,7 @@ export const WorkoutActive: React.FC = () => {
   const formatTime = (secs: number) => {
     const h = Math.floor(secs / 3600);
     const m = Math.floor((secs % 3600) / 60);
-    const s = secs % 60;
+    const s = Math.floor(secs % 60);
     const pad = (n: number) => n.toString().padStart(2, '0');
     return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
   };

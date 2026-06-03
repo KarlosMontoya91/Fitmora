@@ -45,7 +45,7 @@ export const Progress: React.FC = () => {
   const formatDuration = (secs: number) => {
     const h = Math.floor(secs / 3600);
     const m = Math.floor((secs % 3600) / 60);
-    const s = secs % 60;
+    const s = Math.floor(secs % 60);
     return h > 0 
       ? `${h}h ${m}m` 
       : `${m} min ${s}s`;
