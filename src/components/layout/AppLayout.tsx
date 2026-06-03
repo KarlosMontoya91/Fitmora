@@ -34,8 +34,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
   if (isOnboardingPage) {
     return (
-      <div className="flex min-h-screen w-full items-center justify-center bg-slate-50 p-4 transition-colors dark:bg-slate-950">
-        <main className="w-full max-w-md overflow-hidden rounded-3xl border-2 border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+      <div className="flex min-h-screen w-full items-center justify-center bg-slate-50 p-0 md:p-4 transition-colors dark:bg-slate-950">
+        <main className="w-full max-w-md h-dvh md:h-auto overflow-y-auto md:rounded-3xl border-0 md:border-2 border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900">
           {children}
         </main>
       </div>
@@ -48,7 +48,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   if (isWorkoutActive) {
     return (
       <div className="flex min-h-screen w-full items-center justify-center bg-slate-50 transition-colors dark:bg-slate-950">
-        <main className="w-full max-w-md h-screen md:h-[840px] overflow-hidden md:rounded-3xl border-2 border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900 relative">
+        <main className="w-full max-w-md h-dvh md:h-[840px] overflow-y-auto md:rounded-3xl border-0 md:border-2 border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900 relative">
           {children}
         </main>
       </div>
@@ -59,7 +59,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     <div className="flex min-h-screen w-full items-center justify-center bg-gradient-to-br from-indigo-50/40 via-slate-100/50 to-cyan-50/40 p-0 md:p-6 transition-colors dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       
       {/* Desktop App mockup framing container */}
-      <div className="relative flex h-screen w-full max-w-md flex-col overflow-hidden border-0 bg-white shadow-none transition-all duration-300 md:h-[840px] md:rounded-[36px] md:border-8 md:border-slate-800 dark:bg-slate-950 md:dark:border-slate-800 md:shadow-2xl">
+      <div className="relative flex h-dvh w-full max-w-md flex-col overflow-hidden border-0 bg-white shadow-none transition-all duration-300 md:h-[840px] md:rounded-[36px] md:border-8 md:border-slate-800 dark:bg-slate-950 md:dark:border-slate-800 md:shadow-2xl">
         
         {/* Top Header */}
         <header className="sticky top-0 z-20 flex h-16 w-full items-center justify-between border-b-2 border-slate-100 bg-white/95 px-4 backdrop-blur-md dark:border-slate-900 dark:bg-slate-950/95">

@@ -10,6 +10,7 @@ import { Progress } from './pages/Progress';
 import { Avatar } from './pages/Avatar';
 import { Profile } from './pages/Profile';
 import { Settings } from './pages/Settings';
+import { Splash } from './pages/Splash';
 
 // A simple routing guard to redirect to onboarding if no profile exists
 const RouteGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -94,16 +95,10 @@ export const App: React.FC = () => {
             }
           />
 
-          {/* Fallback Redirections */}
+          {/* Splash Presentation */}
           <Route
             path="/"
-            element={
-              useUserStore.getState().isOnboarded ? (
-                <Navigate to="/home" replace />
-              ) : (
-                <Navigate to="/onboarding" replace />
-              )
-            }
+            element={<Splash />}
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

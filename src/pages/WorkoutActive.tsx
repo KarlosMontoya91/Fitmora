@@ -356,7 +356,7 @@ export const WorkoutActive: React.FC = () => {
   }
 
   return (
-    <div className="flex h-full flex-col bg-slate-900 text-white p-4 justify-between select-none relative">
+    <div className="flex min-h-full flex-col bg-slate-900 text-white p-4 justify-between select-none relative pb-8">
       
       {/* 1. TOP STATUS PANEL */}
       <div className="flex items-center justify-between border-b border-slate-800 pb-3">
