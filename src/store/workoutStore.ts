@@ -43,6 +43,7 @@ interface WorkoutStore {
   
   // Actions
   startWorkout: (type: WorkoutType, planId?: string) => void;
+  startTimer: () => void;
   pauseWorkout: () => void;
   resumeWorkout: () => void;
   tick: () => void;
@@ -208,6 +209,20 @@ export const useWorkoutStore = create<WorkoutStore>()(
             }
           }, 3000);
         }
+      },
+
+      startTimer: () => {
+        set((state) => {
+          if (!state.activeWorkout) return {};
+          return {
+            activeWorkout: {
+              ...state.activeWorkout,
+              lastTickTime: Date.now(),
+              currentSegmentDuration: 0,
+              currentSegmentDistance: 0,
+            }
+          };
+        });
       },
 
       pauseWorkout: () => {

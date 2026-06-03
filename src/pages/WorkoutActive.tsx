@@ -21,6 +21,7 @@ export const WorkoutActive: React.FC = () => {
     bluetoothSearching,
     gpsSignal,
     startWorkout,
+    startTimer,
     pauseWorkout,
     resumeWorkout,
     tick,
@@ -336,6 +337,7 @@ export const WorkoutActive: React.FC = () => {
                 } catch (e) {
                   console.warn('Machine start failed:', e);
                 }
+                startTimer();
                 setIsSetupScreen(false);
               }}
               className="btn-game-primary bg-emerald-500 hover:bg-emerald-400 py-4 text-sm font-black flex items-center justify-center gap-2 w-full animate-bounce-slow"
@@ -346,7 +348,10 @@ export const WorkoutActive: React.FC = () => {
             </button>
           ) : (
             <button
-              onClick={() => setIsSetupScreen(false)}
+              onClick={() => {
+                startTimer();
+                setIsSetupScreen(false);
+              }}
               className="btn-game-outline border-slate-800 bg-slate-850 hover:bg-slate-800 text-slate-200 py-3.5 text-xs font-black flex items-center justify-center gap-2 w-full"
               style={{ boxShadow: 'none' }}
             >
