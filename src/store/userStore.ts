@@ -18,6 +18,7 @@ interface UserState {
   setTheme: (theme: 'light' | 'dark') => void;
   incrementStreak: () => void;
   resetStreak: () => void;
+  checkStreakValidity: () => void;
   resetAllData: () => void;
 }
 
@@ -202,14 +203,14 @@ export const useUserStore = create<UserState>()(
           let newStreak = state.profile.streak;
           
           if (state.profile.lastWorkoutDate) {
-            const lastDate = new Date(state.profile.lastWorkoutDate);
-            const today = new Date(todayStr);
-            const diffTime = Math.abs(today.getTime() - lastDate.getTime());
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            const lastDate = new Date(state.profile.lastWorkoutDate + 'T00:00:00');
+            const today = new Date(todayStr + 'T00:00:00');
+            const diffTime = today.getTime() - lastDate.getTime();
+            const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
             
             if (diffDays === 1) {
               newStreak += 1;
-            } else if (diffDays > 1) {
+            } else {
               newStreak = 1; // streak broken, reset to 1
             }
           } else {
@@ -235,6 +236,31 @@ export const useUserStore = create<UserState>()(
               streak: 0,
             },
           };
+        });
+      },
+
+      checkStreakValidity: () => {
+        set((state) => {
+          if (!state.profile || !state.profile.lastWorkoutDate) return {};
+          
+          const todayStr = new Date().toISOString().split('T')[0];
+          if (state.profile.lastWorkoutDate === todayStr) return {};
+          
+          const lastDate = new Date(state.profile.lastWorkoutDate + 'T00:00:00');
+          const today = new Date(todayStr + 'T00:00:00');
+          const diffTime = today.getTime() - lastDate.getTime();
+          const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+          
+          if (diffDays > 1) {
+            // Streak broken! Reset to 0
+            return {
+              profile: {
+                ...state.profile,
+                streak: 0,
+              }
+            };
+          }
+          return {};
         });
       },
 

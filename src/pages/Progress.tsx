@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useWorkoutStore } from '../store/workoutStore';
 import { useUserStore } from '../store/userStore';
+import { PiggySpeechBubble } from '../components/piggy/PiggySpeechBubble';
 import type { WorkoutSession } from '../types/workout';
 import type { Achievement } from '../types/reward';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
@@ -60,9 +61,8 @@ export const Progress: React.FC = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Prepare chart data based on filter
+  // Prepare chart data based on filter (NO dummy values allowed)
   const getChartData = () => {
-    // Return mock data for clean demo, combined with actual history if present!
     const data: any[] = [];
     const today = new Date();
 
@@ -80,8 +80,8 @@ export const Progress: React.FC = () => {
 
         data.push({
           name: weekdays[d.getDay()],
-          distancia: Number((distance || (i === 4 ? 4.2 : i === 2 ? 3.5 : 0)).toFixed(1)),
-          calorias: calories || (i === 4 ? 220 : i === 2 ? 180 : 0),
+          distancia: Number(distance.toFixed(1)),
+          calorias: calories,
         });
       }
     } else if (filter === 'month') {
@@ -97,8 +97,8 @@ export const Progress: React.FC = () => {
 
         data.push({
           name: `${d.getDate()}/${d.getMonth()+1}`,
-          distancia: Number((distance || (i % 9 === 0 ? 5.2 : i % 6 === 0 ? 2.0 : 0)).toFixed(1)),
-          calorias: calories || (i % 9 === 0 ? 300 : i % 6 === 0 ? 120 : 0),
+          distancia: Number(distance.toFixed(1)),
+          calorias: calories,
         });
       }
     } else {
@@ -115,8 +115,8 @@ export const Progress: React.FC = () => {
 
         data.push({
           name: months[monthIndex],
-          distancia: Number((distance || (i === 3 ? 15.0 : i === 2 ? 22.0 : i === 1 ? 12.5 : 0)).toFixed(1)),
-          calorias: calories || (i === 3 ? 800 : i === 2 ? 1200 : i === 1 ? 700 : 0),
+          distancia: Number(distance.toFixed(1)),
+          calorias: calories,
         });
       }
     }
@@ -136,8 +136,11 @@ export const Progress: React.FC = () => {
       {/* 1. Page Title */}
       <div>
         <h1 className="text-2xl font-black text-slate-800 dark:text-slate-100">Progreso</h1>
-        <p className="text-xs text-slate-400 dark:text-slate-500">Visualiza tus estadísticas acumuladas y tu historial médico.</p>
+        <p className="text-xs text-slate-400 dark:text-slate-500">Visualiza tus estadísticas acumuladas y tu historial de salud.</p>
       </div>
+
+      {/* Piggy Speech Bubble */}
+      <PiggySpeechBubble />
 
       {/* 2. Global stats overview counters */}
       <section className="grid grid-cols-3 gap-3">
@@ -187,38 +190,46 @@ export const Progress: React.FC = () => {
           </div>
         </div>
 
-        {/* Chart View */}
-        <div className="h-48 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 10, right: 5, left: -20, bottom: 0 }}>
-              <defs>
-                <linearGradient id="colorDist" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.4}/>
-                  <stop offset="95%" stopColor="#4F46E5" stopOpacity={0.0}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme === 'dark' ? '#1E293B' : '#F1F5F9'} />
-              <XAxis dataKey="name" stroke={theme === 'dark' ? '#94A3B8' : '#64748B'} fontSize={10} tickLine={false} />
-              <YAxis stroke={theme === 'dark' ? '#94A3B8' : '#64748B'} fontSize={10} tickLine={false} />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: theme === 'dark' ? '#1E293B' : '#FFFFFF',
-                  borderColor: theme === 'dark' ? '#334155' : '#E2E8F0',
-                  borderRadius: '12px',
-                  color: theme === 'dark' ? '#F8FAFC' : '#0F172A',
-                  fontSize: '11px',
-                  fontFamily: 'Outfit, sans-serif'
-                }}
-              />
-              <Area type="monotone" dataKey="distancia" stroke="#4F46E5" strokeWidth={2.5} fillOpacity={1} fill="url(#colorDist)" name="Distancia (km)" />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
+        {/* Chart View (shows empty state when history is empty) */}
+        {history.length === 0 ? (
+          <div className="h-48 w-full flex flex-col items-center justify-center text-slate-400 dark:text-slate-650 bg-slate-50/20 dark:bg-slate-950/20 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 p-4">
+            <TrendingUp className="h-8 w-8 mb-2 opacity-50 text-indigo-500" />
+            <span className="text-xs font-black">Aún no hay datos de actividad</span>
+            <span className="text-[10px] text-slate-405 mt-1">Completa tu primera sesión para ver tu rendimiento</span>
+          </div>
+        ) : (
+          <div className="h-48 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData} margin={{ top: 10, right: 5, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorDist" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.4}/>
+                    <stop offset="95%" stopColor="#4F46E5" stopOpacity={0.0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme === 'dark' ? '#1E293B' : '#F1F5F9'} />
+                <XAxis dataKey="name" stroke={theme === 'dark' ? '#94A3B8' : '#64748B'} fontSize={10} tickLine={false} />
+                <YAxis stroke={theme === 'dark' ? '#94A3B8' : '#64748B'} fontSize={10} tickLine={false} />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: theme === 'dark' ? '#1E293B' : '#FFFFFF',
+                    borderColor: theme === 'dark' ? '#334155' : '#E2E8F0',
+                    borderRadius: '12px',
+                    color: theme === 'dark' ? '#F8FAFC' : '#0F172A',
+                    fontSize: '11px',
+                    fontFamily: 'Outfit, sans-serif'
+                  }}
+                />
+                <Area type="monotone" dataKey="distancia" stroke="#4F46E5" strokeWidth={2.5} fillOpacity={1} fill="url(#colorDist)" name="Distancia (km)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </section>
 
       {/* 4. Weight Tracking History Card */}
-      <section className="card-game flex flex-col gap-3">
-        <div className="flex justify-between items-center">
+      <section className="card-game flex flex-col gap-4">
+        <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
           <h2 className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none">Control de Peso</h2>
           <span className="text-[10px] text-brand-secondary dark:text-brand-secondaryDark font-extrabold flex items-center gap-1">
             <TrendingUp className="h-3.5 w-3.5" />
@@ -227,17 +238,55 @@ export const Progress: React.FC = () => {
         </div>
 
         {/* Current Weight Display */}
-        <div className="flex items-center gap-4 rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50">
-          <div className="flex flex-col flex-1">
-            <span className="text-2xl font-black text-slate-800 dark:text-slate-100">{profile.weight} kg</span>
-            <span className="text-[9px] font-black text-slate-400 tracking-wider">PESO ACTUAL REGISTRADO</span>
+        <div className="grid grid-cols-2 gap-3.5 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-850">
+          <div className="flex flex-col">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Último Peso</span>
+            <span className="text-xl font-black text-slate-800 dark:text-slate-100 mt-1">{profile.weight} kg</span>
           </div>
-          
-          {/* Simple historical line */}
-          <div className="text-xs font-bold text-slate-500 dark:text-slate-400 flex flex-col items-end">
-            <span>IMC: {((profile.weight / Math.pow(profile.height/100, 2)).toFixed(1))}</span>
-            <span className="text-[9px] text-slate-400 mt-0.5">ESTADO: SALUDABLE</span>
+          <div className="flex flex-col text-right">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Índice de Masa Corporal (IMC)</span>
+            <span className="text-sm font-black text-slate-800 dark:text-slate-100 mt-1">
+              {((profile.weight / Math.pow(profile.height/100, 2)).toFixed(1))}
+            </span>
+            <span className="text-[9.5px] text-brand-secondary dark:text-brand-secondaryDark font-bold mt-0.5 uppercase">
+              {((profile.weight / Math.pow(profile.height/100, 2)) < 18.5) ? 'Bajo Peso'
+                : ((profile.weight / Math.pow(profile.height/100, 2)) < 25) ? 'Normal'
+                : ((profile.weight / Math.pow(profile.height/100, 2)) < 30) ? 'Sobrepeso'
+                : 'Obesidad'}
+            </span>
           </div>
+        </div>
+
+        {/* Weight history list */}
+        {profile.weightHistory && profile.weightHistory.length > 0 ? (
+          <div className="flex flex-col gap-2 mt-1">
+            <div className="flex justify-between items-center text-[10px] font-black text-slate-400 uppercase tracking-wider">
+              <span>Historial de Mediciones</span>
+              <span className="text-slate-505 font-extrabold dark:text-slate-400">
+                Cambio total: {(profile.weight - profile.weightHistory[0].weight).toFixed(1)} kg
+              </span>
+            </div>
+            
+            <div className="flex flex-col gap-1.5 max-h-36 overflow-y-auto pr-1">
+              {profile.weightHistory.map((item, idx) => (
+                <div key={idx} className="flex justify-between items-center text-[11px] py-1.5 border-b border-slate-100 dark:border-slate-850 last:border-b-0">
+                  <span className="text-slate-550 dark:text-slate-400 font-bold">
+                    {idx === 0 ? '📍 Inicial' : idx === profile.weightHistory.length - 1 ? '🎯 Último' : `⚖️ Registro ${idx + 1}`} ({new Date(item.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })})
+                  </span>
+                  <span className="font-extrabold text-slate-800 dark:text-slate-200">
+                    {item.weight.toFixed(1)} kg
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <p className="text-[10px] text-slate-405 text-center py-2">Sin historial de peso registrado</p>
+        )}
+
+        {/* Reminder to update weight */}
+        <div className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400 bg-indigo-50/20 dark:bg-slate-900/30 p-2.5 rounded-xl text-center leading-normal border border-indigo-155/15">
+          ⚖️ Recuerda actualizar tu peso periódicamente en la pestaña de <b>Perfil</b> para llevar un seguimiento exacto de tu avance físico.
         </div>
       </section>
 

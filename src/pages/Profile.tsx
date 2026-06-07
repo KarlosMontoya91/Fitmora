@@ -12,8 +12,10 @@ import {
   Sparkles, 
   MapPin, 
   Flame,
-  Coins
+  Coins,
+  HelpCircle
 } from 'lucide-react';
+import { LevelInfoModal } from '../components/piggy/LevelInfoModal';
 import confetti from 'canvas-confetti';
 
 export const Profile: React.FC = () => {
@@ -21,6 +23,7 @@ export const Profile: React.FC = () => {
   const { history } = useWorkoutStore();
 
   const [isEditing, setIsEditing] = useState(false);
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
   const [name, setName] = useState(profile?.name || '');
   const [age, setAge] = useState(profile?.age || 25);
   const [height, setHeight] = useState(profile?.height || 170);
@@ -176,7 +179,17 @@ export const Profile: React.FC = () => {
         {/* Leveling Bar tracker */}
         <div className="flex flex-col gap-1.5 mt-2 bg-slate-50 dark:bg-slate-950/30 p-4 rounded-2xl border border-slate-100 dark:border-slate-850/40">
           <div className="flex justify-between items-center text-[9px] font-black text-slate-400 tracking-wider uppercase">
-            <span>Progreso de Nivel</span>
+            <span className="flex items-center gap-1">
+              Progreso de Nivel
+              <button 
+                type="button" 
+                onClick={() => setIsInfoOpen(true)}
+                className="text-slate-400 hover:text-brand-primary dark:hover:text-brand-primaryDark transition-colors"
+                aria-label="Información del sistema de niveles"
+              >
+                <HelpCircle className="h-3 w-3" />
+              </button>
+            </span>
             <span className="text-indigo-650 dark:text-indigo-400">{distanceInCurrentLevel.toFixed(2)} / 5.00 km</span>
           </div>
           
@@ -472,6 +485,8 @@ export const Profile: React.FC = () => {
         </div>
       </section>
 
+      {/* Leveling explain modal */}
+      <LevelInfoModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} />
     </div>
   );
 };

@@ -14,7 +14,7 @@ export const Onboarding: React.FC = () => {
   const { addNotification } = useRewardStore();
 
   const [step, setStep] = useState(1);
-  const totalSteps = 8;
+  const totalSteps = 7;
 
   // Form states
   const [name, setName] = useState('');
@@ -321,83 +321,8 @@ export const Onboarding: React.FC = () => {
           </div>
         )}
 
-        {/* STEP 6: Character Avatar Initial Customization */}
+        {/* STEP 6: Sensors Permissions */}
         {step === 6 && (
-          <div className="flex flex-col items-center">
-            <h2 className="text-xl font-black text-slate-900 dark:text-white mb-2 text-center">Diseña tu Avatar inicial</h2>
-            <p className="text-xs text-slate-400 dark:text-slate-500 mb-4 text-center">¡Elige tu apariencia de juego!</p>
-
-            {/* Avatar Preview */}
-            <div className="mb-6 relative">
-              <AvatarVisual config={config} size={110} animate={true} />
-              <div className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-brand-secondary text-white border-2 border-white dark:border-slate-900 shadow">
-                <Sparkles className="h-4 w-4" />
-              </div>
-            </div>
-
-            {/* Character styling controls */}
-            <div className="w-full max-w-xs flex flex-col gap-3">
-              {/* Skin tones */}
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-black text-slate-400 tracking-wider">COLOR DE PIEL</span>
-                <div className="flex gap-2.5 justify-center">
-                  {skinTones.map((s) => (
-                    <button
-                      key={s.id}
-                      onClick={() => updateConfig({ skinTone: s.id })}
-                      className={`h-7 w-7 rounded-full border-2 transition-all ${
-                        config.skinTone === s.id ? 'border-brand-primary scale-110' : 'border-slate-200'
-                      }`}
-                      style={{ backgroundColor: s.hex }}
-                      aria-label={`Piel ${s.label}`}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* Hair styles */}
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-black text-slate-400 tracking-wider">TIPO DE CABELLO</span>
-                <div className="flex flex-wrap gap-1.5 justify-center">
-                  {hairStyles.map((h) => (
-                    <button
-                      key={h.id}
-                      onClick={() => updateConfig({ hairStyle: h.id })}
-                      className={`rounded-xl px-2.5 py-1 text-xs font-bold border transition-all ${
-                        config.hairStyle === h.id
-                          ? 'border-brand-primary bg-brand-primary/5 text-brand-primary'
-                          : 'border-slate-200 bg-white text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-350'
-                      }`}
-                    >
-                      {h.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Hair colors */}
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-black text-slate-400 tracking-wider">COLOR DE CABELLO</span>
-                <div className="flex gap-2.5 justify-center">
-                  {hairColors.map((c) => (
-                    <button
-                      key={c.id}
-                      onClick={() => updateConfig({ hairColor: c.id })}
-                      className={`h-7 w-7 rounded-full border-2 transition-all ${
-                        config.hairColor === c.id ? 'border-brand-primary scale-110' : 'border-slate-200'
-                      }`}
-                      style={{ backgroundColor: c.hex }}
-                      aria-label={`Cabello ${c.label}`}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 7: Sensors Permissions */}
-        {step === 7 && (
           <div className="flex flex-col items-center">
             <h2 className="text-xl font-black text-slate-900 dark:text-white mb-2 text-center">Permisos de Sensores</h2>
             <p className="text-xs text-slate-400 dark:text-slate-500 mb-6 text-center max-w-xs leading-tight">
@@ -471,8 +396,8 @@ export const Onboarding: React.FC = () => {
           </div>
         )}
 
-        {/* STEP 8: All Ready Success Screen */}
-        {step === 8 && (
+        {/* STEP 7: All Ready Success Screen */}
+        {step === 7 && (
           <div className="flex flex-col items-center text-center">
             <img 
               src={`${import.meta.env.BASE_URL}mascot.jpg`} 
@@ -484,13 +409,20 @@ export const Onboarding: React.FC = () => {
             />
             <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2">¡Todo listo, {name}!</h2>
             <p className="text-sm text-slate-500 dark:text-slate-400 mb-8 max-w-xs leading-relaxed">
-              ¡Tu perfil ha sido configurado con éxito! He cargado tu cartera virtual con <span className="text-amber-500 font-extrabold">100 Monedas 💰</span> para que las uses en el personalizador del avatar.
+              ¡Tu perfil ha sido configurado con éxito! He cargado tu cartera virtual con <span className="text-amber-500 font-extrabold">100 Monedas 💰</span>. ¡Entrena para acumular kilómetros y hacer evolucionar a tu cochinito!
             </p>
 
             <div className="relative w-28 h-28 mb-8">
-              <AvatarVisual config={config} size={110} animate={true} />
-              <div className="absolute top-0 right-0 animate-pulse bg-emerald-500 text-white rounded-full p-1.5 border-2 border-white shadow">
-                <Check className="h-5 w-5 stroke-[3.5]" />
+              <img
+                src={`${import.meta.env.BASE_URL}piggi_up1.png`}
+                alt="Tu Cochinito Inicial"
+                className="w-28 h-28 object-cover rounded-full border-4 border-slate-200 bg-white shadow-xl animate-bounce-slow"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = `${import.meta.env.BASE_URL}mascot.jpg`;
+                }}
+              />
+              <div className="absolute top-0 right-0 bg-emerald-500 text-white rounded-full p-1.5 border-2 border-white shadow">
+                <Check className="h-4.5 w-4.5 stroke-[3.5]" />
               </div>
             </div>
 

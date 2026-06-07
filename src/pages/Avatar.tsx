@@ -1,572 +1,271 @@
-import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
-import { useAvatarStore } from '../store/avatarStore';
+import React, { useState } from 'react';
 import { useUserStore } from '../store/userStore';
+import { useWorkoutStore } from '../store/workoutStore';
 import { useRewardStore } from '../store/rewardStore';
-import { AvatarVisual } from '../components/avatar/AvatarVisual';
-import { AVATAR_CATALOG } from '../data/avatarItems';
-import { SkinTone, HairStyle, HairColor, ClothingType, ClothingColor, AccessoryType } from '../types/avatar';
-import { ShoppingBag, Sparkles, Award, Palette, Shirt, UserCircle2, ArrowRight, Lock, CheckCircle2, CircleDollarSign } from 'lucide-react';
+import { PiggySpeechBubble } from '../components/piggy/PiggySpeechBubble';
+import { LevelInfoModal } from '../components/piggy/LevelInfoModal';
+import { 
+  Trophy, 
+  Coins, 
+  Flame, 
+  MapPin, 
+  Lock, 
+  Sparkles, 
+  HelpCircle, 
+  ChevronRight, 
+  Award,
+  Goal,
+  ShoppingBag,
+  CheckCircle2
+} from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 export const Avatar: React.FC = () => {
-  const location = useLocation();
-
-  // Stores
-  const { config, unlockedItemIds, updateConfig, buyItem } = useAvatarStore();
-  const { profile } = useUserStore();
+  const profile = useUserStore((state) => state.profile);
+  const { history } = useWorkoutStore();
   const { achievements } = useRewardStore();
 
-  const [activeTab, setActiveTab] = useState<'customize' | 'shop' | 'rewards'>('customize');
-  const [shopCategory, setShopCategory] = useState<'clothing' | 'hairStyle' | 'accessory' | 'shoes'>('clothing');
-  const [custCategory, setCustCategory] = useState<'body' | 'hair' | 'clothes' | 'accessories'>('body');
-
-  useEffect(() => {
-    // If navigated from achievements quick link, open rewards tab
-    const params = new URLSearchParams(location.search);
-    const tabParam = params.get('tab');
-    if (tabParam === 'rewards') {
-      setActiveTab('rewards');
-    }
-  }, [location]);
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState<'none' | 'achievements'>('none');
 
   if (!profile) return null;
 
-  // Customization selection lists
-  const skinTones: { id: SkinTone; label: string; hex: string }[] = [
-    { id: 'fair', label: 'Claro', hex: '#FFDBAC' },
-    { id: 'peach', label: 'Durazno', hex: '#F1C27D' },
-    { id: 'olive', label: 'Oliva', hex: '#E0AC69' },
-    { id: 'bronze', label: 'Bronce', hex: '#C68642' },
-    { id: 'dark', label: 'Oscuro', hex: '#8D5524' },
-  ];
+  // Calculate distance-based level stats (1 level per 5 km)
+  const totalDistance = history.reduce((acc, curr) => acc + curr.distance, 0);
+  const currentLevel = Math.floor(totalDistance / 5) + 1;
+  const distanceInCurrentLevel = totalDistance % 5;
+  const progressPercentage = (distanceInCurrentLevel / 5) * 100;
+  const kmRemaining = 5 - distanceInCurrentLevel;
 
-  const expressions = [
-    { id: 'happy', label: 'Feliz' },
-    { id: 'smile', label: 'Sonriente' },
-    { id: 'determined', label: 'Focado' },
-    { id: 'energetic', label: 'Activo' },
-    { id: 'cool', label: 'Fresco' },
-  ];
-
-  const hairStyles: { id: HairStyle; label: string }[] = [
-    { id: 'short', label: 'Corto' },
-    { id: 'long', label: 'Largo' },
-    { id: 'spiky', label: 'Spiky' },
-    { id: 'curly', label: 'Rizado' },
-    { id: 'ponytail', label: 'Coleta' },
-    { id: 'bald', label: 'Calvo' },
-  ];
-
-  const hairColors: { id: HairColor; label: string; hex: string }[] = [
-    { id: 'black', label: 'Negro', hex: '#111827' },
-    { id: 'brown', label: 'Café', hex: '#5C3A21' },
-    { id: 'blonde', label: 'Rubio', hex: '#F59E0B' },
-    { id: 'red', label: 'Rojo', hex: '#DC2626' },
-    { id: 'silver', label: 'Plata', hex: '#9CA3AF' },
-  ];
-
-  const clothingTypes: { id: ClothingType; label: string }[] = [
-    { id: 'tshirt', label: 'T-Shirt' },
-    { id: 'tanktop', label: 'Esqueleto' },
-    { id: 'hoodie', label: 'Sudadera' },
-    { id: 'jacket', label: 'Chaqueta' },
-    { id: 'jersey', label: 'Jersey' },
-  ];
-
-  const clothingColors: { id: ClothingColor; label: string; hex: string }[] = [
-    { id: 'indigo', label: 'Índigo', hex: '#4F46E5' },
-    { id: 'cyan', label: 'Cyan', hex: '#06B6D4' },
-    { id: 'green', label: 'Verde', hex: '#22C55E' },
-    { id: 'orange', label: 'Naranja', hex: '#F97316' },
-    { id: 'yellow', label: 'Amarillo', hex: '#FACC15' },
-    { id: 'red', label: 'Rojo', hex: '#EF4444' },
-    { id: 'purple', label: 'Morado', hex: '#A855F7' },
-    { id: 'gold', label: 'Oro', hex: '#EAB308' },
-  ];
-
-  // Shop items selector
-  const shopItems = AVATAR_CATALOG.filter(item => item.category === shopCategory);
-
-  const handlePurchase = (itemId: string) => {
-    const unlocked = buyItem(itemId);
-    if (unlocked) {
-      confetti({
-        particleCount: 50,
-        spread: 40,
-        origin: { y: 0.6 }
-      });
-      
-      // Auto-equip purchased item
-      const item = AVATAR_CATALOG.find(i => i.id === itemId);
-      if (item) {
-        if (item.category === 'clothing') {
-          updateConfig({ clothingType: item.type as any, clothingColor: item.color as any });
-        } else if (item.category === 'hairStyle') {
-          updateConfig({ hairStyle: item.type as any });
-        } else if (item.category === 'accessory') {
-          updateConfig({ accessory: item.type as any });
-        } else if (item.category === 'shoes') {
-          updateConfig({ shoesColor: item.type as any });
-        }
-      }
-    } else {
-      alert('⚠️ Monedas insuficientes. ¡Completa más entrenamientos para ganar monedas! 💰');
-    }
+  // Evolution Stage
+  const getPiggyImage = (lvl: number) => {
+    if (lvl <= 10) return `${import.meta.env.BASE_URL}piggi_up1.png`;
+    if (lvl <= 20) return `${import.meta.env.BASE_URL}piggi_up2.png`;
+    if (lvl <= 30) return `${import.meta.env.BASE_URL}piggi_up3.png`;
+    if (lvl <= 40) return `${import.meta.env.BASE_URL}piggi_up4.png`;
+    return `${import.meta.env.BASE_URL}piggi_up5.jpg`;
   };
 
-  const equipItemFromCatalog = (item: any) => {
-    if (!unlockedItemIds.includes(item.id)) return;
-    
-    if (item.category === 'clothing') {
-      updateConfig({ clothingType: item.type, clothingColor: item.color });
-    } else if (item.category === 'hairStyle') {
-      updateConfig({ hairStyle: item.type });
-    } else if (item.category === 'accessory') {
-      updateConfig({ accessory: item.type });
-    } else if (item.category === 'shoes') {
-      updateConfig({ shoesColor: item.type });
-    }
+  const getStageTitle = (lvl: number) => {
+    if (lvl <= 10) return "Etapa 1: Cochinito Pequeño y Sucio 🐷";
+    if (lvl <= 20) return "Etapa 2: Cochinito Entrenador 🏃‍♂️";
+    if (lvl <= 30) return "Etapa 3: Cochinito Fit Musculoso 🏋️‍♂️";
+    if (lvl <= 40) return "Etapa 4: Cochinito Súper Guerrero ⚡";
+    return "Etapa 5: Cochinito Campeón Supremo 🏆";
   };
 
-  const isItemCurrentlyEquipped = (item: any) => {
-    if (item.category === 'clothing') {
-      return config.clothingType === item.type && config.clothingColor === item.color;
-    }
-    if (item.category === 'hairStyle') {
-      return config.hairStyle === item.type;
-    }
-    if (item.category === 'accessory') {
-      return config.accessory === item.type;
-    }
-    if (item.category === 'shoes') {
-      return config.shoesColor === item.type;
-    }
-    return false;
-  };
+  // Stats summaries
+  const unlockedAchievementsCount = achievements.filter(a => a.isUnlocked).length;
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-5 pb-6">
       
-      {/* Live Avatar Preview Widget */}
-      <section className="card-game p-5 flex flex-col items-center bg-gradient-to-b from-indigo-50/5 via-white to-white dark:from-slate-900/10 dark:via-slate-900 dark:to-slate-900 border-2">
-        <AvatarVisual config={config} size={130} animate={true} />
-        
-        <div className="text-center mt-3.5">
-          <h1 className="text-lg font-black text-slate-800 dark:text-slate-100 uppercase tracking-wide leading-none">{profile.name}</h1>
-          <span className="text-[10px] text-slate-400 font-extrabold block mt-1">NIVEL FÍSICO: {profile.level === 'beginner' ? 'PRINCIPIANTE' : profile.level === 'intermediate' ? 'INTERMEDIO' : 'AVANZADO'}</span>
+      {/* 1. HEADER */}
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-2xl font-black text-slate-800 dark:text-slate-100 leading-none">Mi Personaje</h1>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5 font-bold">
+            Entrena para evolucionar a tu cochinito Fitmora.
+          </p>
         </div>
-      </section>
-
-      {/* 2. Flat Tab Selector (Duolingo Style) */}
-      <div className="flex rounded-2xl bg-slate-100 p-1 dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800">
+        
+        {/* Info button */}
         <button
-          onClick={() => setActiveTab('customize')}
-          className={`flex-1 rounded-xl py-2 text-center text-[10px] font-black transition-all flex items-center justify-center gap-1 ${
-            activeTab === 'customize'
-              ? 'bg-white text-brand-primary shadow dark:bg-slate-800 dark:text-brand-primaryDark'
-              : 'text-slate-400'
-          }`}
+          onClick={() => setIsInfoOpen(true)}
+          className="h-8 w-8 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-850 flex items-center justify-center text-slate-400 hover:text-brand-primary dark:hover:text-brand-primaryDark transition-all active:scale-90 border-2 border-slate-100 dark:border-slate-800"
+          aria-label="Ayuda e información sobre el sistema de niveles"
         >
-          <Palette className="h-4 w-4" />
-          <span>ROPERO</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('shop')}
-          className={`flex-1 rounded-xl py-2 text-center text-[10px] font-black transition-all flex items-center justify-center gap-1 ${
-            activeTab === 'shop'
-              ? 'bg-white text-brand-primary shadow dark:bg-slate-800 dark:text-brand-primaryDark'
-              : 'text-slate-400'
-          }`}
-        >
-          <ShoppingBag className="h-4 w-4" />
-          <span>TIENDA</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('rewards')}
-          className={`flex-1 rounded-xl py-2 text-center text-[10px] font-black transition-all flex items-center justify-center gap-1 ${
-            activeTab === 'rewards'
-              ? 'bg-white text-brand-primary shadow dark:bg-slate-800 dark:text-brand-primaryDark'
-              : 'text-slate-400'
-          }`}
-        >
-          <Award className="h-4 w-4" />
-          <span>LOGROS</span>
+          <HelpCircle className="h-5 w-5" />
         </button>
       </div>
 
-      {/* TAB CONTENT: CUSTOMIZE (Ropero Wardrobe) */}
-      {activeTab === 'customize' && (
-        <div className="flex flex-col gap-4.5 animate-fadeIn">
-          {/* Sub-category selector */}
-          <div className="flex justify-around border-b border-slate-100 pb-2 dark:border-slate-800">
-            {[
-              { id: 'body', label: 'Cuerpo' },
-              { id: 'hair', label: 'Cabello' },
-              { id: 'clothes', label: 'Ropa' },
-              { id: 'accessories', label: 'Accesorios' },
-            ].map((sub) => (
-              <button
-                key={sub.id}
-                onClick={() => setCustCategory(sub.id as any)}
-                className={`text-xs font-black pb-1.5 border-b-2 transition-all leading-none ${
-                  custCategory === sub.id
-                    ? 'border-brand-primary text-brand-primary dark:border-brand-primaryDark dark:text-brand-primaryDark'
-                    : 'border-transparent text-slate-400 hover:text-slate-600'
-                }`}
-              >
-                {sub.label}
-              </button>
-            ))}
+      {/* 2. PIGGY SPEECH BUBBLE */}
+      <PiggySpeechBubble />
+
+      {/* 3. MASCOT SPOTLIGHT CARD */}
+      <section className="card-game p-6 bg-gradient-to-br from-indigo-500 to-indigo-700 dark:from-slate-900 dark:to-indigo-950 border-0 shadow-xl text-white relative overflow-hidden flex flex-col items-center select-none">
+        
+        {/* Glowing background shapes */}
+        <div className="absolute -top-12 -left-12 w-32 h-32 bg-white/10 rounded-full blur-xl" />
+        <div className="absolute -bottom-16 -right-16 w-40 h-40 bg-cyan-400/20 rounded-full blur-xl" />
+
+        {/* Level tag top-left */}
+        <div className="absolute top-4 left-4 bg-white/20 px-3 py-1 rounded-full text-xs font-black select-none tracking-wider">
+          NIVEL {currentLevel}
+        </div>
+
+        {/* Coins count top-right */}
+        <div className="absolute top-4 right-4 flex items-center gap-1 bg-white/20 px-3 py-1 rounded-full text-xs font-black select-none tracking-wider">
+          <Coins className="h-4 w-4 text-amber-300 fill-current animate-pulse" />
+          <span>{profile.coins} Monedas</span>
+        </div>
+
+        {/* Cochinito Image with major visual protagonism */}
+        <div className="relative mt-6 mb-4 group">
+          <div className="absolute inset-0 rounded-full bg-white/20 blur-xl scale-110 animate-pulse-slow" />
+          <img
+            src={getPiggyImage(currentLevel)}
+            alt="Tu personaje cochinito"
+            className="w-44 h-44 md:w-52 md:h-52 object-cover rounded-full border-4 border-white shadow-2xl relative z-10 animate-bounce-slow"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = `${import.meta.env.BASE_URL}mascot.jpg`;
+            }}
+          />
+        </div>
+
+        {/* Stage description text */}
+        <div className="text-center z-10">
+          <h2 className="text-base font-black uppercase tracking-wider">{profile.name}</h2>
+          <p className="text-xs font-bold text-cyan-200 mt-1">
+            {getStageTitle(currentLevel)}
+          </p>
+        </div>
+
+        {/* Secondary stats overview bar */}
+        <div className="w-full grid grid-cols-3 gap-2 border-t border-white/10 pt-4 mt-5 text-center">
+          <div>
+            <span className="text-[9px] font-black text-white/50 block tracking-widest leading-none">KM TOTALES</span>
+            <span className="text-sm font-black mt-1 block leading-none">{totalDistance.toFixed(2)} km</span>
           </div>
-
-          {/* Sub-content lists */}
-          <div className="card-game p-4.5 bg-slate-50/50 dark:bg-slate-900/30">
-            {custCategory === 'body' && (
-              <div className="flex flex-col gap-4">
-                {/* Skin tones */}
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Tono de Piel</span>
-                  <div className="flex gap-2">
-                    {skinTones.map((s) => (
-                      <button
-                        key={s.id}
-                        onClick={() => updateConfig({ skinTone: s.id })}
-                        className={`h-8 w-8 rounded-full border-2 transition-all active:scale-95 ${
-                          config.skinTone === s.id ? 'border-brand-primary scale-110 shadow' : 'border-slate-200'
-                        }`}
-                        style={{ backgroundColor: s.hex }}
-                        aria-label={s.label}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                {/* Expressions */}
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Expresión Facial</span>
-                  <div className="flex flex-wrap gap-2">
-                    {expressions.map((e) => (
-                      <button
-                        key={e.id}
-                        onClick={() => updateConfig({ expression: e.id as any })}
-                        className={`rounded-xl px-3 py-1.5 text-xs font-bold border transition-all active:scale-95 ${
-                          config.expression === e.id
-                            ? 'border-brand-primary bg-brand-primary/5 text-brand-primary dark:border-brand-primaryDark'
-                            : 'border-slate-250 bg-white text-slate-500 dark:border-slate-800 dark:bg-slate-950'
-                        }`}
-                      >
-                        {e.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {custCategory === 'hair' && (
-              <div className="flex flex-col gap-4">
-                {/* Hair styles */}
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Estilo de Cabello</span>
-                  <div className="flex flex-wrap gap-2">
-                    {hairStyles.map((h) => {
-                      const catalogItem = AVATAR_CATALOG.find(i => i.category === 'hairStyle' && i.type === h.id);
-                      const isUnlocked = catalogItem ? unlockedItemIds.includes(catalogItem.id) : true;
-                      
-                      return (
-                        <button
-                          key={h.id}
-                          disabled={!isUnlocked}
-                          onClick={() => updateConfig({ hairStyle: h.id })}
-                          className={`rounded-xl px-3 py-1.5 text-xs font-bold border transition-all active:scale-95 flex items-center gap-1 ${
-                            config.hairStyle === h.id
-                              ? 'border-brand-primary bg-brand-primary/5 text-brand-primary dark:border-brand-primaryDark'
-                              : !isUnlocked
-                              ? 'border-slate-200 bg-slate-100 text-slate-350 dark:border-slate-850 dark:bg-slate-900/50 cursor-not-allowed'
-                              : 'border-slate-250 bg-white text-slate-500 dark:border-slate-850 dark:bg-slate-950'
-                          }`}
-                        >
-                          {!isUnlocked && <Lock className="h-3 w-3 shrink-0" />}
-                          <span>{h.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Hair colors */}
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Color de Cabello</span>
-                  <div className="flex gap-2">
-                    {hairColors.map((c) => (
-                      <button
-                        key={c.id}
-                        onClick={() => updateConfig({ hairColor: c.id })}
-                        className={`h-8 w-8 rounded-full border-2 transition-all active:scale-95 ${
-                          config.hairColor === c.id ? 'border-brand-primary scale-110 shadow' : 'border-slate-200'
-                        }`}
-                        style={{ backgroundColor: c.hex }}
-                        aria-label={c.label}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {custCategory === 'clothes' && (
-              <div className="flex flex-col gap-4">
-                {/* Clothes styles */}
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Tipo de Ropa</span>
-                  <div className="flex flex-wrap gap-2">
-                    {clothingTypes.map((c) => {
-                      // Find if any apparel of this type is unlocked
-                      const itemsOfType = AVATAR_CATALOG.filter(i => i.category === 'clothing' && i.type === c.id);
-                      const hasUnlocked = itemsOfType.some(i => unlockedItemIds.includes(i.id));
-
-                      return (
-                        <button
-                          key={c.id}
-                          disabled={!hasUnlocked}
-                          onClick={() => {
-                            // Find first unlocked item color to equip
-                            const firstUnlocked = itemsOfType.find(i => unlockedItemIds.includes(i.id));
-                            if (firstUnlocked) {
-                              updateConfig({ clothingType: c.id, clothingColor: firstUnlocked.color as any });
-                            }
-                          }}
-                          className={`rounded-xl px-3 py-1.5 text-xs font-bold border transition-all active:scale-95 flex items-center gap-1 ${
-                            config.clothingType === c.id
-                              ? 'border-brand-primary bg-brand-primary/5 text-brand-primary dark:border-brand-primaryDark'
-                              : !hasUnlocked
-                              ? 'border-slate-200 bg-slate-100 text-slate-350 dark:border-slate-850 dark:bg-slate-900/50 cursor-not-allowed'
-                              : 'border-slate-250 bg-white text-slate-500 dark:border-slate-850 dark:bg-slate-950'
-                          }`}
-                        >
-                          {!hasUnlocked && <Lock className="h-3 w-3 shrink-0" />}
-                          <span>{c.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Clothes colors (equips the current clothing type with selected color, if unlocked!) */}
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Color</span>
-                  <div className="flex flex-wrap gap-2">
-                    {clothingColors.map((col) => {
-                      // Check if current apparel config of this color is unlocked
-                      const catalogItem = AVATAR_CATALOG.find(i => i.category === 'clothing' && i.type === config.clothingType && i.color === col.id);
-                      const isUnlocked = catalogItem ? unlockedItemIds.includes(catalogItem.id) : false;
-
-                      return (
-                        <button
-                          key={col.id}
-                          disabled={!isUnlocked}
-                          onClick={() => updateConfig({ clothingColor: col.id })}
-                          className={`h-8 w-8 rounded-full border-2 transition-all active:scale-95 flex items-center justify-center ${
-                            config.clothingColor === col.id && isUnlocked ? 'border-brand-primary scale-110 shadow' : 'border-slate-200'
-                          } ${!isUnlocked ? 'opacity-30 cursor-not-allowed' : ''}`}
-                          style={{ backgroundColor: col.hex }}
-                          aria-label={col.label}
-                        >
-                          {!isUnlocked && <Lock className="h-3.5 w-3.5 text-white stroke-[2.5]" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {custCategory === 'accessories' && (
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Equipar Accesorios Desbloqueados</span>
-                
-                <div className="flex flex-col gap-2">
-                  {AVATAR_CATALOG.filter(item => item.category === 'accessory' || item.category === 'shoes').map((item) => {
-                    const unlocked = unlockedItemIds.includes(item.id);
-                    const equipped = isItemCurrentlyEquipped(item);
-                    
-                    return (
-                      <div 
-                        key={item.id}
-                        className={`flex items-center justify-between p-2.5 rounded-xl border transition-all ${
-                          equipped 
-                            ? 'border-brand-primary bg-indigo-50/45 dark:border-brand-primaryDark dark:bg-slate-900'
-                            : 'border-slate-100 bg-white/70 dark:border-slate-800 dark:bg-slate-950/20'
-                        }`}
-                      >
-                        <div className="flex flex-col text-left">
-                          <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{item.name}</span>
-                          <span className="text-[9px] text-slate-450 uppercase mt-0.5">{item.category}</span>
-                        </div>
-
-                        {equipped ? (
-                          <span className="text-[9px] font-black bg-brand-primary text-white dark:bg-brand-primaryDark px-2 py-0.5 rounded-md">
-                            EQUIPADO
-                          </span>
-                        ) : unlocked ? (
-                          <button
-                            onClick={() => equipItemFromCatalog(item)}
-                            className="text-[9px] font-black border-2 border-slate-200 hover:border-slate-350 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900 px-3 py-1 rounded-xl text-slate-600 dark:text-slate-350 transition-colors"
-                          >
-                            EQUIPAR
-                          </button>
-                        ) : (
-                          <span className="text-[9px] font-bold text-slate-400 flex items-center gap-1">
-                            <Lock className="h-3 w-3 shrink-0" />
-                            BLOQUEADO
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+          <div>
+            <span className="text-[9px] font-black text-white/50 block tracking-widest leading-none">RACHA</span>
+            <span className="text-sm font-black mt-1 block leading-none flex items-center justify-center gap-0.5">
+              <Flame className="h-4 w-4 text-orange-400 fill-current" />
+              <span>{profile.streak} días</span>
+            </span>
+          </div>
+          <div>
+            <span className="text-[9px] font-black text-white/50 block tracking-widest leading-none">EXPERIENCIA</span>
+            <span className="text-sm font-black mt-1 block leading-none">{profile.experience} XP</span>
           </div>
         </div>
-      )}
 
-      {/* TAB CONTENT: SHOP (Virtual Shop) */}
-      {activeTab === 'shop' && (
-        <div className="flex flex-col gap-4 animate-fadeIn">
-          {/* Shop categories bar */}
-          <div className="flex justify-around border-b border-slate-100 pb-2 dark:border-slate-800">
-            {[
-              { id: 'clothing', label: 'Ropa' },
-              { id: 'accessory', label: 'Accesorios' },
-              { id: 'shoes', label: 'Calzado' },
-            ].map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setShopCategory(cat.id as any)}
-                className={`text-xs font-black pb-1.5 border-b-2 transition-all leading-none ${
-                  shopCategory === cat.id
-                    ? 'border-brand-primary text-brand-primary dark:border-brand-primaryDark dark:text-brand-primaryDark'
-                    : 'border-transparent text-slate-400 hover:text-slate-650'
-                }`}
-              >
-                {cat.label}
-              </button>
-            ))}
-          </div>
+      </section>
 
-          {/* Catalog listings */}
-          <div className="flex flex-col gap-3">
-            {shopItems.map((item) => {
-              const unlocked = unlockedItemIds.includes(item.id);
-              const isEquipped = isItemCurrentlyEquipped(item);
-              
-              return (
-                <div 
-                  key={item.id}
-                  className="card-game p-4.5 flex items-center justify-between border border-slate-100 bg-white/80 dark:border-slate-800 dark:bg-slate-900/50"
-                >
-                  <div className="flex flex-col text-left">
-                    <h3 className="text-sm font-black text-slate-800 dark:text-slate-200 leading-tight">
-                      {item.name}
-                    </h3>
-                    
-                    {/* Item conditions text */}
-                    {item.requiredMetric ? (
-                      <span className="text-[10px] text-brand-primary dark:text-brand-primaryDark font-bold mt-1.5">
-                        🔒 Requisito: {item.requiredMetric.description}
-                      </span>
-                    ) : (
-                      <span className="text-[10px] text-slate-450 mt-1">
-                        Estilo libre para tu ropero virtual.
-                      </span>
-                    )}
-                  </div>
-
-                  {unlocked ? (
-                    isEquipped ? (
-                      <span className="text-[9px] font-black bg-brand-primary text-white dark:bg-brand-primaryDark px-2.5 py-1 rounded-lg select-none">
-                        EQUIPADO
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => equipItemFromCatalog(item)}
-                        className="text-[9px] font-black border-2 border-slate-200 px-3 py-1.5 rounded-xl hover:border-slate-350 dark:border-slate-800 dark:text-slate-350 active:scale-95 transition-all bg-white dark:bg-slate-950"
-                      >
-                        EQUIPAR
-                      </button>
-                    )
-                  ) : item.requiredMetric ? (
-                    <span className="text-[9px] font-extrabold text-slate-400 bg-slate-100 border border-slate-200 dark:bg-slate-900 dark:border-slate-800 px-2.5 py-1 rounded-lg select-none uppercase">
-                      Desbloqueable
-                    </span>
-                  ) : (
-                    <button
-                      onClick={() => handlePurchase(item.id)}
-                      className="btn-game-primary py-2 px-3.5 text-[10px] font-black flex items-center gap-1.5 shrink-0"
-                      style={{ boxShadow: 'none' }}
-                    >
-                      <CircleDollarSign className="h-4 w-4" />
-                      <span>{item.coinsCost} mon.</span>
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+      {/* 4. LEVEL PROGRESS TRACKER */}
+      <section className="card-game flex flex-col gap-3.5">
+        <div className="flex justify-between items-center text-xs font-black text-slate-800 dark:text-slate-200">
+          <span>Camino al Nivel {currentLevel + 1}</span>
+          <span className="text-brand-primary dark:text-brand-primaryDark">{distanceInCurrentLevel.toFixed(2)} / 5.00 km</span>
         </div>
-      )}
 
-      {/* TAB CONTENT: REWARDS (Achievements showcase cabinet) */}
-      {activeTab === 'rewards' && (
-        <div className="flex flex-col gap-3.5 animate-fadeIn">
-          {achievements.map((ach) => (
-            <div 
-              key={ach.id}
-              className={`card-game p-4.5 flex items-center gap-4.5 border-2 transition-all relative ${
-                ach.isUnlocked 
-                  ? 'border-emerald-100 bg-white dark:border-emerald-950/20' 
-                  : 'border-slate-200 bg-slate-50/50 dark:border-slate-900/10'
-              }`}
-            >
-              {/* Badge visual icon (Lucide or Trophy) */}
-              <div className={`h-12 w-12 rounded-2xl flex items-center justify-center shrink-0 border shadow-sm transition-transform ${
-                ach.isUnlocked
-                  ? 'bg-amber-500 text-white border-amber-600'
-                  : 'bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-650'
-              }`}>
-                <Award className="h-6.5 w-6.5 stroke-[2.2]" />
+        {/* Progress Bar */}
+        <div className="h-4 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-200 dark:border-slate-750">
+          <div 
+            className="h-full bg-gradient-to-r from-brand-primary to-brand-secondary rounded-full transition-all duration-500"
+            style={{ width: `${progressPercentage}%` }}
+          />
+        </div>
+
+        {/* Meters remaining motivation */}
+        <p className="text-xs font-bold text-slate-500 dark:text-slate-400 text-center leading-relaxed mt-0.5">
+          {kmRemaining > 0 ? (
+            <>
+              ¡Te faltan solo <span className="text-brand-primary dark:text-brand-primaryDark font-black">{kmRemaining.toFixed(2)} km</span> de entrenamiento para evolucionar! 🏆
+            </>
+          ) : (
+            "¡Listo para evolucionar en tu siguiente sesión! 🚀"
+          )}
+        </p>
+      </section>
+
+      {/* 5. CHARACTER ACCESS HUB GRID */}
+      <section className="flex flex-col gap-3">
+        <h2 className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none mb-1">Secciones del Personaje</h2>
+        
+        <div className="grid grid-cols-1 gap-3">
+          
+          {/* Achievements Trigger */}
+          <button
+            onClick={() => setActiveSection(activeSection === 'achievements' ? 'none' : 'achievements')}
+            className={`flex items-center justify-between rounded-2xl border-2 p-4 transition-all text-left active:scale-[0.99] ${
+              activeSection === 'achievements'
+                ? 'border-brand-primary bg-indigo-50/20 dark:border-brand-primaryDark dark:bg-slate-900'
+                : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-950/20'
+            }`}
+          >
+            <div className="flex items-center gap-3.5">
+              <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400">
+                <Award className="h-5.5 w-5.5" />
               </div>
-
-              {/* Descriptions */}
-              <div className="flex flex-col text-left flex-1 select-none pr-6">
-                <div className="flex items-center gap-2">
-                  <h3 className={`text-sm font-black leading-tight ${ach.isUnlocked ? 'text-slate-800 dark:text-slate-150' : 'text-slate-550 dark:text-slate-400'}`}>
-                    {ach.title}
-                  </h3>
-                  {ach.isUnlocked && (
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500 fill-emerald-100 dark:fill-emerald-950/20 shrink-0" />
-                  )}
-                </div>
-                <p className="text-[10px] text-slate-450 dark:text-slate-500 leading-snug mt-1.5">
-                  {ach.description}
-                </p>
-
-                {/* Reward tokens indicators */}
-                <div className="flex gap-2.5 mt-2">
-                  <span className="text-[9px] font-extrabold text-amber-600 dark:text-amber-500">
-                    💰 +{ach.coinsReward} monedas
-                  </span>
-                  <span className="text-[9px] font-extrabold text-indigo-650 dark:text-indigo-400">
-                    🏆 +{ach.xpReward} XP
-                  </span>
-                </div>
+              <div className="flex flex-col">
+                <span className="text-xs font-black text-slate-800 dark:text-slate-200">Logros del Personaje</span>
+                <span className="text-[10px] text-slate-450 mt-0.5">Tienes {unlockedAchievementsCount} de {achievements.length} logros desbloqueados</span>
               </div>
             </div>
-          ))}
+            <ChevronRight className={`h-5 w-5 text-slate-400 transition-transform ${activeSection === 'achievements' ? 'rotate-90' : ''}`} />
+          </button>
+
+          {/* Collapsed Achievements List */}
+          {activeSection === 'achievements' && (
+            <div className="flex flex-col gap-2.5 pl-2 border-l-2 border-slate-200 dark:border-slate-800 animate-fadeIn mt-1">
+              {achievements.map((ach) => (
+                <div 
+                  key={ach.id}
+                  className={`flex items-center gap-3.5 p-3.5 rounded-2xl border transition-all ${
+                    ach.isUnlocked 
+                      ? 'border-emerald-100 bg-emerald-50/10 dark:border-emerald-950/25 dark:bg-slate-900/10' 
+                      : 'border-slate-100 bg-slate-50/30 dark:border-slate-850 dark:bg-slate-950/10 opacity-70'
+                  }`}
+                >
+                  <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 border shadow-sm ${
+                    ach.isUnlocked
+                      ? 'bg-amber-400 text-white border-amber-500'
+                      : 'bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-800 dark:border-slate-750 dark:text-slate-500'
+                  }`}>
+                    <Trophy className="h-5 w-5" />
+                  </div>
+                  <div className="flex flex-col text-left flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-black text-slate-800 dark:text-slate-200 truncate">{ach.title}</span>
+                      {ach.isUnlocked && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />}
+                    </div>
+                    <span className="text-[10px] text-slate-450 leading-snug mt-0.5">{ach.description}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Shop Visual - MOCKED/PROXIMAMENTE */}
+          <div className="flex items-center justify-between rounded-2xl border-2 border-slate-100 bg-slate-50/50 p-4 dark:border-slate-850 dark:bg-slate-950/10 opacity-70 select-none">
+            <div className="flex items-center gap-3.5">
+              <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-500 dark:bg-slate-900 dark:text-slate-500">
+                <ShoppingBag className="h-5.5 w-5.5" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs font-black text-slate-800 dark:text-slate-200">Tienda de Atuendos</span>
+                <span className="text-[10px] text-slate-450 mt-0.5">Personalización con accesorios y skins</span>
+              </div>
+            </div>
+            <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 flex items-center gap-1 bg-slate-100 dark:bg-slate-900 px-2.5 py-1 rounded-xl">
+              <Lock className="h-3 w-3 shrink-0" />
+              <span>Próximamente</span>
+            </span>
+          </div>
+
+          {/* Goals Visual - MOCKED/PROXIMAMENTE */}
+          <div className="flex items-center justify-between rounded-2xl border-2 border-slate-100 bg-slate-50/50 p-4 dark:border-slate-850 dark:bg-slate-950/10 opacity-70 select-none">
+            <div className="flex items-center gap-3.5">
+              <div className="p-2.5 rounded-xl bg-cyan-50 text-cyan-500 dark:bg-slate-900 dark:text-slate-500">
+                <Goal className="h-5.5 w-5.5" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs font-black text-slate-800 dark:text-slate-200">Objetivos del Personaje</span>
+                <span className="text-[10px] text-slate-450 mt-0.5">Metas personalizadas para desbloquear multiplicadores</span>
+              </div>
+            </div>
+            <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 flex items-center gap-1 bg-slate-100 dark:bg-slate-900 px-2.5 py-1 rounded-xl">
+              <Lock className="h-3 w-3 shrink-0" />
+              <span>Próximamente</span>
+            </span>
+          </div>
+
         </div>
-      )}
+      </section>
+
+      {/* Leveling explain modal */}
+      <LevelInfoModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} />
 
     </div>
   );

@@ -2,15 +2,29 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUserStore } from '../store/userStore';
 import { useWorkoutStore } from '../store/workoutStore';
-import { useAvatarStore } from '../store/avatarStore';
-import { AvatarVisual } from '../components/avatar/AvatarVisual';
-import { Flame, Compass, Dumbbell, MapPin, Award, ChevronRight, Play } from 'lucide-react';
+import { PiggySpeechBubble } from '../components/piggy/PiggySpeechBubble';
+import { Flame, Compass, Dumbbell, MapPin, Award, ChevronRight, Play, Coins } from 'lucide-react';
 
 export const Home: React.FC = () => {
   const navigate = useNavigate();
   const profile = useUserStore((state) => state.profile);
   const history = useWorkoutStore((state) => state.history);
-  const avatarConfig = useAvatarStore((state) => state.config);
+
+  const getPiggyImage = (lvl: number) => {
+    if (lvl <= 10) return `${import.meta.env.BASE_URL}piggi_up1.png`;
+    if (lvl <= 20) return `${import.meta.env.BASE_URL}piggi_up2.png`;
+    if (lvl <= 30) return `${import.meta.env.BASE_URL}piggi_up3.png`;
+    if (lvl <= 40) return `${import.meta.env.BASE_URL}piggi_up4.png`;
+    return `${import.meta.env.BASE_URL}piggi_up5.jpg`;
+  };
+
+  const getStageTitle = (lvl: number) => {
+    if (lvl <= 10) return "Etapa 1: Bebé";
+    if (lvl <= 20) return "Etapa 2: Entrenador";
+    if (lvl <= 30) return "Etapa 3: Fit";
+    if (lvl <= 40) return "Etapa 4: Guerrero";
+    return "Etapa 5: Campeón";
+  };
 
   if (!profile) return null;
 
@@ -132,15 +146,25 @@ export const Home: React.FC = () => {
         </div>
       </section>
 
-      {/* 4. Main Avatar CTA Card */}
+      {/* 4. Main Mascot / Character CTA Card */}
       <section className="card-game flex items-center justify-between p-4 bg-white dark:bg-slate-900">
         <div className="flex items-center gap-4">
-          <AvatarVisual config={avatarConfig} size={80} animate={true} />
-          <div className="flex flex-col">
-            <span className="text-[10px] font-black text-slate-400 tracking-wider">TU AVATAR</span>
-            <span className="text-sm font-black text-slate-700 dark:text-slate-200 uppercase">{profile.name}</span>
-            <span className="text-[10px] text-brand-secondary dark:text-brand-secondaryDark font-extrabold mt-0.5">
-              💰 {profile.coins} monedas
+          <div className="relative shrink-0">
+            <div className="absolute inset-0 rounded-full blur-md bg-brand-primary/10 scale-105" />
+            <img 
+              src={getPiggyImage(currentLevel)} 
+              alt="Cochinito Mascota" 
+              className="w-16 h-16 object-cover rounded-full border-2 border-brand-primary bg-white relative z-10"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = `${import.meta.env.BASE_URL}mascot.jpg`;
+              }}
+            />
+          </div>
+          <div className="flex flex-col text-left">
+            <span className="text-[10px] font-black text-slate-400 tracking-wider">MI PERSONAJE</span>
+            <span className="text-sm font-black text-slate-700 dark:text-slate-200 uppercase leading-tight">{profile.name}</span>
+            <span className="text-[10px] text-brand-primary dark:text-brand-primaryDark font-extrabold mt-0.5">
+              {getStageTitle(currentLevel)}
             </span>
           </div>
         </div>
@@ -148,32 +172,14 @@ export const Home: React.FC = () => {
         <button
           onClick={() => navigate('/avatar')}
           className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-350 hover:bg-slate-100 transition-colors active:scale-95 border-2 border-slate-150 dark:border-slate-800"
-          aria-label="Ir a personalizar avatar"
+          aria-label="Ver progreso del personaje"
         >
           <ChevronRight className="h-5 w-5" />
         </button>
       </section>
 
-      {/* Coach Mora Motivational Widget */}
-      <section className="card-game p-4 flex gap-4 items-center bg-amber-50/50 dark:bg-slate-900/50 border border-amber-200/40 dark:border-slate-800/40 animate-fadeIn select-none">
-        <img 
-          src={`${import.meta.env.BASE_URL}mascot.jpg`} 
-          alt="Coach Mora" 
-          className="w-16 h-16 object-cover rounded-2xl border-2 border-brand-primary bg-white shadow shrink-0"
-          onError={(e) => {
-            (e.target as HTMLElement).style.display = 'none';
-          }}
-        />
-        <div className="flex flex-col gap-1 text-left">
-          <span className="text-[10px] font-black text-brand-primary dark:text-brand-primaryDark tracking-wider">CONSEJO DEL COACH MORA</span>
-          <p className="text-xs font-bold text-slate-700 dark:text-slate-200 leading-relaxed">
-            {todayKm > 0 
-              ? `¡Excelente trabajo recorriendo ${todayKm.toFixed(1)} km hoy! Sigue así para cuidar tu salud y ganar más monedas.`
-              : '¿Hoy es día de caminadora, rodillo o exterior? Conecta tus sensores Bluetooth o enciende el GPS y ganemos experiencia juntos.'
-            }
-          </p>
-        </div>
-      </section>
+      {/* 5. Piggy Speech Bubble (Coach speech bubble) */}
+      <PiggySpeechBubble />
 
       {/* 5. Giant Primary CTA Workout Button */}
       <div className="w-full flex justify-center py-1">

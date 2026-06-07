@@ -21,6 +21,7 @@ const RouteGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 export const App: React.FC = () => {
   const { theme } = useUserStore();
   const [showSplash, setShowSplash] = useState(true);
+  const [isHydrated, setIsHydrated] = useState(false);
 
   // Sync theme class on load
   useEffect(() => {
@@ -31,7 +32,21 @@ export const App: React.FC = () => {
     }
   }, [theme]);
 
-  if (showSplash) {
+  // Hydration sync
+  useEffect(() => {
+    if (useUserStore.persist.hasHydrated()) {
+      setIsHydrated(true);
+      useUserStore.getState().checkStreakValidity();
+    } else {
+      const unsub = useUserStore.persist.onFinishHydration(() => {
+        setIsHydrated(true);
+        useUserStore.getState().checkStreakValidity();
+      });
+      return unsub;
+    }
+  }, []);
+
+  if (showSplash || !isHydrated) {
     return <Splash onComplete={() => setShowSplash(false)} />;
   }
 

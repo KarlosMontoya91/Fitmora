@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, Dumbbell, BarChart2, Gamepad2, Settings, Bell, Flame, CircleDollarSign, Check } from 'lucide-react';
+import { Home, Dumbbell, BarChart2, Gamepad2, Settings, Bell, Flame, CircleDollarSign, Check, HelpCircle } from 'lucide-react';
 import { useUserStore } from '../../store/userStore';
 import { useRewardStore } from '../../store/rewardStore';
 import { useWorkoutStore } from '../../store/workoutStore';
+import { LevelInfoModal } from '../piggy/LevelInfoModal';
 import { AnimatePresence, motion } from 'framer-motion';
 
 interface AppLayoutProps {
@@ -17,6 +18,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const { notifications, markAsRead, markAllAsRead } = useRewardStore();
   const { activeWorkout } = useWorkoutStore();
   const [showNotifications, setShowNotifications] = useState(false);
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -24,7 +26,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     { name: 'Inicio', path: '/home', icon: Home },
     { name: 'Entrenar', path: '/workouts', icon: Dumbbell },
     { name: 'Progreso', path: '/progress', icon: BarChart2 },
-    { name: 'Avatar', path: '/avatar', icon: Gamepad2 },
+    { name: 'Personaje', path: '/avatar', icon: Gamepad2 },
     { name: 'Ajustes', path: '/settings', icon: Settings },
   ];
 
@@ -63,19 +65,28 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         
         {/* Top Header */}
         <header className="sticky top-0 z-20 flex h-16 w-full items-center justify-between border-b-2 border-slate-100 bg-white/95 px-4 backdrop-blur-md dark:border-slate-900 dark:bg-slate-950/95">
-          {/* Level Indicator */}
-          <div 
-            onClick={() => navigate('/profile')}
-            className="flex items-center gap-2 cursor-pointer group select-none"
-            aria-label={`Ver perfil, nivel actual: ${profile.userLevel}`}
-          >
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-primary to-violet-600 font-extrabold text-white shadow-sm transition-transform group-hover:scale-105">
-              {profile.userLevel}
+          {/* Level Indicator with Help Info Icon */}
+          <div className="flex items-center gap-1.5 select-none">
+            <div 
+              onClick={() => navigate('/profile')}
+              className="flex items-center gap-2 cursor-pointer group"
+              aria-label={`Ver perfil, nivel actual: ${profile.userLevel}`}
+            >
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-primary to-violet-600 font-extrabold text-white shadow-sm transition-transform group-hover:scale-105">
+                {profile.userLevel}
+              </div>
+              <div className="flex flex-col text-xs leading-none">
+                <span className="font-bold text-slate-800 dark:text-slate-100 leading-tight">NIVEL</span>
+                <span className="text-[10px] text-brand-lightTextSec dark:text-brand-darkTextSec">VER PERFIL</span>
+              </div>
             </div>
-            <div className="flex flex-col text-xs leading-none">
-              <span className="font-bold text-slate-800 dark:text-slate-100 leading-tight">NIVEL</span>
-              <span className="text-[10px] text-brand-lightTextSec dark:text-brand-darkTextSec">VER PERFIL</span>
-            </div>
+            <button
+              onClick={() => setIsInfoOpen(true)}
+              className="h-7 w-7 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900 flex items-center justify-center text-slate-400 hover:text-brand-primary dark:hover:text-brand-primaryDark transition-all active:scale-90"
+              aria-label="Información del sistema de niveles"
+            >
+              <HelpCircle className="h-4.5 w-4.5" />
+            </button>
           </div>
 
           {/* Center Stats Indicators */}
@@ -207,6 +218,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         </footer>
 
       </div>
+      <LevelInfoModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} />
     </div>
   );
 };
